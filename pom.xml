@@ -11,6 +11,7 @@
 
     <modules>
         <module>atluofu-dynamic-thread-pool-spring-boot-starter</module>
+        <module>atluofu-dynamic-thread-pool-test</module>
     </modules>
 
     <parent>
