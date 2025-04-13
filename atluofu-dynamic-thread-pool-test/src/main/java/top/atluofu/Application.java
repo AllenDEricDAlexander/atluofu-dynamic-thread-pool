@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * @ClassName: Application
- * @description: TODO
+ * @description: Application
  * @author: 有罗敷的马同学
  * @datetime: 2025Year-04Month-13Day-上午8:41
  * @Version: 1.0

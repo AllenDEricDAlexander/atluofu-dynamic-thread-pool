@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * @ClassName: ThreadPoolConfig
- * @description: TODO
+ * @description: ThreadPoolConfig
  * @author: 有罗敷的马同学
  * @datetime: 2025Year-04Month-13Day-上午8:42
  * @Version: 1.0
