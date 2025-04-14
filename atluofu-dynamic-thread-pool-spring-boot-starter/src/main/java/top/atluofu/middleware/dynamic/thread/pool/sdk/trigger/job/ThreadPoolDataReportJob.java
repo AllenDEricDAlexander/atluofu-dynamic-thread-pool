@@ -40,7 +40,6 @@ public class ThreadPoolDataReportJob {
             registry.reportThreadPoolConfigParameter(threadPoolConfigEntity);
             logger.info("动态线程池，上报线程池配置：{}", JSON.toJSONString(threadPoolConfigEntity));
         }
-
     }
 
 }

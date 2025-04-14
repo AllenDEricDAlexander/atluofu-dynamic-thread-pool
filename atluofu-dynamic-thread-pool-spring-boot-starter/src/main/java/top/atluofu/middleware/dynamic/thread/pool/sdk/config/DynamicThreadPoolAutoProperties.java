@@ -1,5 +1,9 @@
 package top.atluofu.middleware.dynamic.thread.pool.sdk.config;
 
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -10,6 +14,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @Version: 1.0
  */
 @ConfigurationProperties(prefix = "dynamic.thread.pool.config", ignoreInvalidFields = true)
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode
 public class DynamicThreadPoolAutoProperties {
 
     /**
@@ -60,101 +68,5 @@ public class DynamicThreadPoolAutoProperties {
      * 设置是否保持长连接，默认为true
      */
     private boolean keepAlive = true;
-
-    public boolean isEnable() {
-        return enable;
-    }
-
-    public void setEnable(boolean enable) {
-        this.enable = enable;
-    }
-
-    public String getHost() {
-        return host;
-    }
-
-    public void setHost(String host) {
-        this.host = host;
-    }
-
-    public int getPort() {
-        return port;
-    }
-
-    public void setPort(int port) {
-        this.port = port;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public int getPoolSize() {
-        return poolSize;
-    }
-
-    public void setPoolSize(int poolSize) {
-        this.poolSize = poolSize;
-    }
-
-    public int getMinIdleSize() {
-        return minIdleSize;
-    }
-
-    public void setMinIdleSize(int minIdleSize) {
-        this.minIdleSize = minIdleSize;
-    }
-
-    public int getIdleTimeout() {
-        return idleTimeout;
-    }
-
-    public void setIdleTimeout(int idleTimeout) {
-        this.idleTimeout = idleTimeout;
-    }
-
-    public int getConnectTimeout() {
-        return connectTimeout;
-    }
-
-    public void setConnectTimeout(int connectTimeout) {
-        this.connectTimeout = connectTimeout;
-    }
-
-    public int getRetryAttempts() {
-        return retryAttempts;
-    }
-
-    public void setRetryAttempts(int retryAttempts) {
-        this.retryAttempts = retryAttempts;
-    }
-
-    public int getRetryInterval() {
-        return retryInterval;
-    }
-
-    public void setRetryInterval(int retryInterval) {
-        this.retryInterval = retryInterval;
-    }
-
-    public int getPingInterval() {
-        return pingInterval;
-    }
-
-    public void setPingInterval(int pingInterval) {
-        this.pingInterval = pingInterval;
-    }
-
-    public boolean isKeepAlive() {
-        return keepAlive;
-    }
-
-    public void setKeepAlive(boolean keepAlive) {
-        this.keepAlive = keepAlive;
-    }
 
 }

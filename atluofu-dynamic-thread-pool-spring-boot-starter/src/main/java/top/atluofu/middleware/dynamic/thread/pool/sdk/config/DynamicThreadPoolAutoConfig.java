@@ -34,8 +34,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 @Slf4j
 public class DynamicThreadPoolAutoConfig {
 
-    private String applicationName;
-
     @Bean("dynamicThreadRedissonClient")
     public RedissonClient redissonClient(DynamicThreadPoolAutoProperties properties) {
         Config config = new Config();
@@ -56,9 +54,7 @@ public class DynamicThreadPoolAutoConfig {
         ;
 
         RedissonClient redissonClient = Redisson.create(config);
-
         log.info("动态线程池，注册器（redis）链接初始化完成。{} {} {}", properties.getHost(), properties.getPoolSize(), !redissonClient.isShutdown());
-
         return redissonClient;
     }
 
@@ -74,7 +70,7 @@ public class DynamicThreadPoolAutoConfig {
 
     @Bean("dynamicThreadPollService")
     public DynamicThreadPoolService dynamicThreadPollService(ApplicationContext applicationContext, Map<String, ThreadPoolExecutor> threadPoolExecutorMap, RedissonClient redissonClient) {
-        applicationName = applicationContext.getEnvironment().getProperty("spring.application.name");
+        String applicationName = applicationContext.getEnvironment().getProperty("spring.application.name");
 
         if (StringUtils.isBlank(applicationName)) {
             applicationName = "缺省的";
@@ -85,7 +81,9 @@ public class DynamicThreadPoolAutoConfig {
         Set<String> threadPoolKeys = threadPoolExecutorMap.keySet();
         for (String threadPoolKey : threadPoolKeys) {
             ThreadPoolConfigEntity threadPoolConfigEntity = redissonClient.<ThreadPoolConfigEntity>getBucket(RegistryEnumVO.THREAD_POOL_CONFIG_PARAMETER_LIST_KEY.getKey() + "_" + applicationName + "_" + threadPoolKey).get();
-            if (null == threadPoolConfigEntity) continue;
+            if (null == threadPoolConfigEntity) {
+                continue;
+            }
             ThreadPoolExecutor threadPoolExecutor = threadPoolExecutorMap.get(threadPoolKey);
             threadPoolExecutor.setCorePoolSize(threadPoolConfigEntity.getCorePoolSize());
             threadPoolExecutor.setMaximumPoolSize(threadPoolConfigEntity.getMaximumPoolSize());
