@@ -3,6 +3,7 @@ package top.atluofu.middleware.dynamic.thread.pool.sdk.config;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.redisson.Redisson;
+import org.redisson.api.RTopic;
 import org.redisson.api.RedissonClient;
 import org.redisson.codec.JsonJacksonCodec;
 import org.redisson.config.Config;
@@ -17,6 +18,7 @@ import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.valobj.Regist
 import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.IRegistry;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.redis.RedisRegistry;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.trigger.job.ThreadPoolDataReportJob;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.trigger.listener.ThreadPoolConfigAdjustListener;
 
 import java.util.Map;
 import java.util.Set;
@@ -33,6 +35,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 @EnableConfigurationProperties(DynamicThreadPoolAutoProperties.class)
 @Slf4j
 public class DynamicThreadPoolAutoConfig {
+
+    private String applicationName;
 
     @Bean("dynamicThreadRedissonClient")
     public RedissonClient redissonClient(DynamicThreadPoolAutoProperties properties) {
@@ -59,6 +63,25 @@ public class DynamicThreadPoolAutoConfig {
     }
 
     @Bean
+    public ThreadPoolConfigAdjustListener threadPoolConfigAdjustListener(IDynamicThreadPoolService dynamicThreadPoolService, IRegistry registry) {
+        return new ThreadPoolConfigAdjustListener(dynamicThreadPoolService, registry);
+    }
+
+    @Bean(name = "dynamicThreadPoolRedisTopic")
+    public RTopic threadPoolConfigAdjustListener(RedissonClient redissonClient, ThreadPoolConfigAdjustListener threadPoolConfigAdjustListener) {
+        RTopic topic = redissonClient.getTopic(RegistryEnumVO.DYNAMIC_THREAD_POOL_REDIS_TOPIC.getKey() + "_" + applicationName);
+        topic.addListener(ThreadPoolConfigEntity.class, threadPoolConfigAdjustListener);
+        return topic;
+    }
+
+    /**
+     * @description:
+     * @author: atluofu
+     * @date: 2025/4/15 下午2:55
+     * @param: [dynamicThreadRedissonClient]
+     * @return: top.atluofu.middleware.dynamic.thread.pool.sdk.registry.IRegistry
+     **/
+    @Bean
     public IRegistry redisRegistry(RedissonClient dynamicThreadRedissonClient) {
         return new RedisRegistry(dynamicThreadRedissonClient);
     }
@@ -70,7 +93,7 @@ public class DynamicThreadPoolAutoConfig {
 
     @Bean("dynamicThreadPollService")
     public DynamicThreadPoolService dynamicThreadPollService(ApplicationContext applicationContext, Map<String, ThreadPoolExecutor> threadPoolExecutorMap, RedissonClient redissonClient) {
-        String applicationName = applicationContext.getEnvironment().getProperty("spring.application.name");
+        applicationName = applicationContext.getEnvironment().getProperty("spring.application.name");
 
         if (StringUtils.isBlank(applicationName)) {
             applicationName = "缺省的";
