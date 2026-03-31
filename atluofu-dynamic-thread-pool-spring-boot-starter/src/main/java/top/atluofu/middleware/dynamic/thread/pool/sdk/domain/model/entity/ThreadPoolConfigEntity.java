@@ -60,10 +60,6 @@ public class ThreadPoolConfigEntity {
     public ThreadPoolConfigEntity() {
     }
 
-    public void setAppName(String appName) {
-        this.appName = appName;
-    }
-
     public ThreadPoolConfigEntity(String appName, String threadPoolName) {
         this.appName = appName;
         this.threadPoolName = threadPoolName;
@@ -73,8 +69,16 @@ public class ThreadPoolConfigEntity {
         return appName;
     }
 
+    public void setAppName(String appName) {
+        this.appName = appName;
+    }
+
     public String getThreadPoolName() {
         return threadPoolName;
+    }
+
+    public void setThreadPoolName(String threadPoolName) {
+        this.threadPoolName = threadPoolName;
     }
 
     public int getCorePoolSize() {
