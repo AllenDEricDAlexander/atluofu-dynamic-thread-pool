@@ -220,19 +220,23 @@ const openEditDialog = async (row) => {
       appName: row.appName,
       threadPoolName: row.threadPoolName
     })
-    const data = res.data
+    
+    // 如果查询返回 null，使用列表中的数据
+    const data = res.data || row
+    
     editForm.value = {
-      appName: data.appName,
-      threadPoolName: data.threadPoolName,
-      corePoolSize: data.corePoolSize,
-      maximumPoolSize: data.maximumPoolSize,
-      activeCount: data.activeCount,
-      queueSize: data.queueSize,
-      remainingCapacity: data.remainingCapacity
+      appName: data.appName || row.appName,
+      threadPoolName: data.threadPoolName || row.threadPoolName,
+      corePoolSize: data.corePoolSize || row.corePoolSize,
+      maximumPoolSize: data.maximumPoolSize || row.maximumPoolSize,
+      activeCount: data.activeCount || row.activeCount,
+      queueSize: data.queueSize || row.queueSize,
+      remainingCapacity: data.remainingCapacity || row.remainingCapacity
     }
     editDialogVisible.value = true
   } catch (error) {
     console.error('获取配置失败', error)
+    ElMessage.error('获取配置失败，请重试')
   }
 }
 
