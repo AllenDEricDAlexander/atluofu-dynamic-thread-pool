@@ -7,11 +7,11 @@ import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.mockito.junit.MockitoJUnitRunner;
 import org.redisson.api.RBucket;
 import org.redisson.api.RList;
 import org.redisson.api.RTopic;
 import org.redisson.api.RedissonClient;
-import org.springframework.test.context.junit4.SpringRunner;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
 import top.atluofu.middleware.dynamic.thread.pool.types.Response;
 
@@ -29,7 +29,7 @@ import static org.mockito.Mockito.*;
  * @datetime: 2026Year-03Month-31Day
  * @Version: 1.0
  */
-@RunWith(SpringRunner.class)
+@RunWith(MockitoJUnitRunner.class)
 public class DynamicThreadPoolControllerTest {
 
     @Mock
