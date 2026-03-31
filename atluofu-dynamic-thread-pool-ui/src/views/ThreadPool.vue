@@ -36,40 +36,40 @@
           </div>
         </template>
 
-        <el-table 
-          :data="threadPoolList" 
+        <el-table
+          :data="threadPoolList"
           v-loading="loading"
           style="width: 100%"
           :header-cell-style="{ background: '#f5f7fa', color: '#606266' }"
           row-key="threadPoolName"
           border
         >
-          <el-table-column prop="appName" label="应用名称" min-width="150" show-overflow-tooltip />
-          <el-table-column prop="threadPoolName" label="线程池名称" min-width="180" show-overflow-tooltip />
-          <el-table-column prop="corePoolSize" label="核心线程数" width="100" align="center" />
-          <el-table-column prop="maximumPoolSize" label="最大线程数" width="100" align="center" />
-          <el-table-column prop="activeCount" label="活跃线程数" width="100" align="center">
+          <el-table-column prop="appName" label="应用名称" :resizable="true" :min-width="100" />
+          <el-table-column prop="threadPoolName" label="线程池名称" :resizable="true" :min-width="100" />
+          <el-table-column prop="corePoolSize" label="核心线程数" :resizable="true" :min-width="80" align="center" />
+          <el-table-column prop="maximumPoolSize" label="最大线程数" :resizable="true" :min-width="80" align="center" />
+          <el-table-column prop="activeCount" label="活跃线程数" :resizable="true" :min-width="80" align="center">
             <template #default="{ row }">
               <el-tag :type="getActiveType(row.activeCount, row.maximumPoolSize)">
                 {{ row.activeCount }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="poolSize" label="当前池中线程数" width="100" align="center" />
-          <el-table-column prop="queueType" label="队列类型" min-width="150" show-overflow-tooltip />
-          <el-table-column prop="queueSize" label="队列任务数" width="100" align="center">
+          <el-table-column prop="poolSize" label="当前池中线程数" :resizable="true" :min-width="90" align="center" />
+          <el-table-column prop="queueType" label="队列类型" :resizable="true" :min-width="100" />
+          <el-table-column prop="queueSize" label="队列任务数" :resizable="true" :min-width="80" align="center">
             <template #default="{ row }">
               <el-tag :type="getQueueType(row.queueSize, row.remainingCapacity)">
                 {{ row.queueSize }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="remainingCapacity" label="队列剩余容量" width="100" align="center" />
-          <el-table-column label="操作" width="120" align="center" fixed="right">
+          <el-table-column prop="remainingCapacity" label="队列剩余容量" :resizable="true" :min-width="90" align="center" />
+          <el-table-column label="操作" :resizable="true" :min-width="80" align="center" fixed="right">
             <template #default="{ row }">
-              <el-button 
-                type="primary" 
-                size="small" 
+              <el-button
+                type="primary"
+                size="small"
                 @click="openEditDialog(row)"
                 :icon="Edit"
               >

@@ -18,11 +18,13 @@ dynamic:
     pool:
       config:
         # 状态；true = 开启、false 关闭
-        enabled: true
+        enable: true
         # redis host
-        host: 192.168.1.108
+        host: 127.0.0.1
         # redis port
-        port: 16379
+        port: 6379
+        # redis password
+        password: HomeLab666
 
 # 日志
 logging:

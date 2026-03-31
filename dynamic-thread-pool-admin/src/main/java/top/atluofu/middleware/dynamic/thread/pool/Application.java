@@ -1,5 +1,10 @@
 package top.atluofu.middleware.dynamic.thread.pool;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import lombok.Data;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
@@ -29,11 +34,22 @@ public class Application {
         @Bean("redissonClient")
         public RedissonClient redissonClient(ConfigurableApplicationContext applicationContext, RedisClientConfigProperties properties) {
             Config config = new Config();
-            // 根据需要可以设定编解码器；https://github.com/redisson/redisson/wiki/4.-%E6%95%B0%E6%8D%AE%E5%BA%8F%E5%88%97%E5%8C%96
-            config.setCodec(JsonJacksonCodec.INSTANCE);
+            
+            // 创建 ObjectMapper 并配置类型信息
+            ObjectMapper objectMapper = new ObjectMapper();
+            objectMapper.activateDefaultTyping(
+                LaissezFaireSubTypeValidator.instance,
+                ObjectMapper.DefaultTyping.NON_FINAL,
+                JsonTypeInfo.As.PROPERTY
+            );
+            objectMapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
+            
+            // 使用自定义 ObjectMapper 的 JsonJacksonCodec
+            config.setCodec(new JsonJacksonCodec(objectMapper));
 
             config.useSingleServer()
                     .setAddress("redis://" + properties.getHost() + ":" + properties.getPort())
+                    .setPassword(properties.getPassword())
                     .setConnectionPoolSize(properties.getPoolSize())
                     .setConnectionMinimumIdleSize(properties.getMinIdleSize())
                     .setIdleConnectionTimeout(properties.getIdleTimeout())
@@ -66,35 +82,35 @@ public class Application {
          */
         private String password;
         /**
-         * 设置连接池的大小，默认为64
+         * 设置连接池的大小，默认为 64
          */
         private int poolSize = 64;
         /**
-         * 设置连接池的最小空闲连接数，默认为10
+         * 设置连接池的最小空闲连接数，默认为 10
          */
         private int minIdleSize = 10;
         /**
-         * 设置连接的最大空闲时间（单位：毫秒），超过该时间的空闲连接将被关闭，默认为10000
+         * 设置连接的最大空闲时间（单位：毫秒），超过该时间的空闲连接将被关闭，默认为 10000
          */
         private int idleTimeout = 10000;
         /**
-         * 设置连接超时时间（单位：毫秒），默认为10000
+         * 设置连接超时时间（单位：毫秒），默认为 10000
          */
         private int connectTimeout = 10000;
         /**
-         * 设置连接重试次数，默认为3
+         * 设置连接重试次数，默认为 3
          */
         private int retryAttempts = 3;
         /**
-         * 设置连接重试的间隔时间（单位：毫秒），默认为1000
+         * 设置连接重试的间隔时间（单位：毫秒），默认为 1000
          */
         private int retryInterval = 1000;
         /**
-         * 设置定期检查连接是否可用的时间间隔（单位：毫秒），默认为0，表示不进行定期检查
+         * 设置定期检查连接是否可用的时间间隔（单位：毫秒），默认为 0，表示不进行定期检查
          */
         private int pingInterval = 0;
         /**
-         * 设置是否保持长连接，默认为true
+         * 设置是否保持长连接，默认为 true
          */
         private boolean keepAlive = true;
     }

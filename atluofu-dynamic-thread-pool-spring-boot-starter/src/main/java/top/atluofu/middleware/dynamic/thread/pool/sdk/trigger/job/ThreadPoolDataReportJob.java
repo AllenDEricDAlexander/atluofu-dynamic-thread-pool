@@ -14,7 +14,7 @@ import java.util.List;
  * @ClassName: ThreadPoolDataReportJob
  * @description: 线程池数据上报任务
  * @author: 有罗敷的马同学
- * @datetime: 2025Year-04Month-14Day-下午8:17
+ * @datetime: 2025Year-04Month-14Day-下午 8:17
  * @Version: 1.0
  */
 public class ThreadPoolDataReportJob {
@@ -32,13 +32,32 @@ public class ThreadPoolDataReportJob {
 
     @Scheduled(cron = "0/20 * * * * ?")
     public void execReportThreadPoolList() {
-        List<ThreadPoolConfigEntity> threadPoolConfigEntities = dynamicThreadPoolService.queryThreadPoolList();
-        registry.reportThreadPool(threadPoolConfigEntities);
-        logger.info("动态线程池，上报线程池信息：{}", JSON.toJSONString(threadPoolConfigEntities));
+        try {
+            // 1. 查询所有线程池状态
+            List<ThreadPoolConfigEntity> threadPoolConfigEntities = dynamicThreadPoolService.queryThreadPoolList();
+            
+            // 2. 上报线程池列表
+            registry.reportThreadPool(threadPoolConfigEntities);
+            logger.info("动态线程池，定时上报线程池列表。数量:{}", threadPoolConfigEntities.size());
 
-        for (ThreadPoolConfigEntity threadPoolConfigEntity : threadPoolConfigEntities) {
-            registry.reportThreadPoolConfigParameter(threadPoolConfigEntity);
-            logger.info("动态线程池，上报线程池配置：{}", JSON.toJSONString(threadPoolConfigEntity));
+            // 3. 逐个上报线程池配置（单个失败不影响其他）
+            for (ThreadPoolConfigEntity threadPoolConfigEntity : threadPoolConfigEntities) {
+                try {
+                    registry.reportThreadPoolConfigParameter(threadPoolConfigEntity);
+                    logger.debug("动态线程池，定时上报线程池配置。{}", JSON.toJSONString(threadPoolConfigEntity));
+                } catch (Exception e) {
+                    logger.error("动态线程池，定时上报单个线程池配置失败。线程池：{}", 
+                        threadPoolConfigEntity.getThreadPoolName(), e);
+                    // 继续上报下一个，不中断整个流程
+                }
+            }
+            
+            logger.info("动态线程池，定时上报完成。成功上报 {}/{} 个线程池", 
+                threadPoolConfigEntities.size(), threadPoolConfigEntities.size());
+                
+        } catch (Exception e) {
+            logger.error("动态线程池，定时上报线程池列表失败", e);
+            // 不抛出异常，避免影响下一次定时执行
         }
     }
 

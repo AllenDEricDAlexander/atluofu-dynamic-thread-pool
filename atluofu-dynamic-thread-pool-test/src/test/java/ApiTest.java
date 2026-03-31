@@ -27,9 +27,11 @@ public class ApiTest {
     @Test
     public void test_dynamicThreadPoolRedisTopic() throws InterruptedException {
         ThreadPoolConfigEntity threadPoolConfigEntity = new ThreadPoolConfigEntity("dynamic-thread-pool-test-app", "threadPoolExecutor01");
-        threadPoolConfigEntity.setPoolSize(100);
+        threadPoolConfigEntity.setCorePoolSize(10);
         threadPoolConfigEntity.setMaximumPoolSize(100);
         dynamicThreadPoolRedisTopic.publish(threadPoolConfigEntity);
+        log.info("测试：发布线程池配置更新 - 核心线程数：{}, 最大线程数：{}", 
+                threadPoolConfigEntity.getCorePoolSize(), threadPoolConfigEntity.getMaximumPoolSize());
         new CountDownLatch(1).await();
     }
 
