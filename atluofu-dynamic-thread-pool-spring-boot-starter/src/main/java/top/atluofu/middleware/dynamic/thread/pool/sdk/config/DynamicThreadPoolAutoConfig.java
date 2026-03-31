@@ -1,5 +1,6 @@
 package top.atluofu.middleware.dynamic.thread.pool.sdk.config;
 
+import com.alibaba.fastjson2.JSON;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
@@ -10,6 +11,7 @@ import org.apache.commons.lang.StringUtils;
 import org.redisson.Redisson;
 import org.redisson.api.RTopic;
 import org.redisson.api.RedissonClient;
+import org.redisson.api.listener.MessageListener;
 import org.redisson.codec.JsonJacksonCodec;
 import org.redisson.config.Config;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -59,7 +61,7 @@ public class DynamicThreadPoolAutoConfig {
     @Bean("dynamicThreadRedissonClient")
     public RedissonClient redissonClient(DynamicThreadPoolAutoProperties properties) {
         Config config = new Config();
-        
+
         // 创建 ObjectMapper 并配置类型信息
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.activateDefaultTyping(
@@ -68,7 +70,7 @@ public class DynamicThreadPoolAutoConfig {
             JsonTypeInfo.As.PROPERTY
         );
         objectMapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
-        
+
         // 使用自定义 ObjectMapper 的 JsonJacksonCodec
         config.setCodec(new JsonJacksonCodec(objectMapper));
 
@@ -104,17 +106,17 @@ public class DynamicThreadPoolAutoConfig {
             RedissonClient redissonClient,
             ThreadPoolConfigAdjustListener threadPoolConfigAdjustListener) {
         RTopic topic = redissonClient.getTopic(RegistryEnumVO.DYNAMIC_THREAD_POOL_REDIS_TOPIC.getKey() + "_" + dynamicThreadPoolApplicationName);
-        topic.addListener(ThreadPoolConfigEntity.class, threadPoolConfigAdjustListener);
+        // 使用 String.class 接收原始 JSON，显式实现 MessageListener 接口
+        // Admin 端直接发布 JSON 字符串，不依赖 JsonJacksonCodec 序列化
+        topic.addListener(String.class, new MessageListener<String>() {
+            @Override
+            public void onMessage(CharSequence channel, String json) {
+                threadPoolConfigAdjustListener.onRawMessage(json);
+            }
+        });
         return topic;
     }
 
-    /**
-     * @description:
-     * @author: atluofu
-     * @date: 2025/4/15 下午2:55
-     * @param: [dynamicThreadRedissonClient]
-     * @return: top.atluofu.middleware.dynamic.thread.pool.sdk.registry.IRegistry
-     **/
     @Bean
     public IRegistry redisRegistry(RedissonClient dynamicThreadRedissonClient) {
         return new RedisRegistry(dynamicThreadRedissonClient);
@@ -134,7 +136,6 @@ public class DynamicThreadPoolAutoConfig {
             Map<String, ThreadPoolExecutor> threadPoolExecutorMap,
             RedissonClient redissonClient) {
 
-        // 获取缓存数据，设置本地线程池配置
         Set<String> threadPoolKeys = threadPoolExecutorMap.keySet();
         for (String threadPoolKey : threadPoolKeys) {
             ThreadPoolConfigEntity threadPoolConfigEntity = redissonClient.<ThreadPoolConfigEntity>getBucket(RegistryEnumVO.THREAD_POOL_CONFIG_PARAMETER_LIST_KEY.getKey() + "_" + dynamicThreadPoolApplicationName + "_" + threadPoolKey).get();

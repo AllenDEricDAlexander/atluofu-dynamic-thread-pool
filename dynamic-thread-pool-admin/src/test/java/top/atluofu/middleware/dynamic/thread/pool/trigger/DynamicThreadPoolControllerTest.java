@@ -9,18 +9,23 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.redisson.api.RBucket;
-import org.redisson.api.RList;
+import org.redisson.api.RMap;
 import org.redisson.api.RTopic;
 import org.redisson.api.RedissonClient;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
 import top.atluofu.middleware.dynamic.thread.pool.types.Response;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 
 /**
  * @ClassName: DynamicThreadPoolControllerTest
@@ -35,8 +40,9 @@ public class DynamicThreadPoolControllerTest {
     @Mock
     private RedissonClient mockRedissonClient;
 
+    @SuppressWarnings("rawtypes")
     @Mock
-    private RList mockRList;
+    private RMap mockRMap;
 
     @Mock
     private RBucket mockRBucket;
@@ -63,8 +69,10 @@ public class DynamicThreadPoolControllerTest {
         entity.setMaximumPoolSize(50);
         mockList.add(entity);
 
-        when(mockRedissonClient.getList("THREAD_POOL_CONFIG_LIST_KEY")).thenReturn(mockRList);
-        when(mockRList.readAll()).thenReturn(mockList);
+        doReturn(mockRMap).when(mockRedissonClient).getMap("THREAD_POOL_CONFIG_LIST_KEY");
+        Map<String, String> mapData = new HashMap<>();
+        mapData.put("test-app", JSON.toJSONString(mockList));
+        doReturn(mapData.values()).when(mockRMap).values();
 
         Response<List<ThreadPoolConfigEntity>> response = controller.queryThreadPoolList();
 
@@ -80,7 +88,7 @@ public class DynamicThreadPoolControllerTest {
      */
     @Test
     public void test_queryThreadPoolList_Exception() {
-        when(mockRedissonClient.getList("THREAD_POOL_CONFIG_LIST_KEY")).thenThrow(new RuntimeException("Redis 连接失败"));
+        doThrow(new RuntimeException("Redis 连接失败")).when(mockRedissonClient).getMap("THREAD_POOL_CONFIG_LIST_KEY");
 
         Response<List<ThreadPoolConfigEntity>> response = controller.queryThreadPoolList();
 
@@ -150,13 +158,13 @@ public class DynamicThreadPoolControllerTest {
 
         String topicKey = "DYNAMIC_THREAD_POOL_REDIS_TOPIC_test-app";
         when(mockRedissonClient.getTopic(anyString())).thenReturn(mockRTopic);
-        when(mockRTopic.publish(request)).thenReturn(1L);
+        when(mockRTopic.publish(anyString())).thenReturn(1L);
 
         Response<Boolean> response = controller.updateThreadPoolConfig(request);
 
         assertEquals(Response.Code.SUCCESS.getCode(), response.getCode());
         assertTrue(response.getData());
-        verify(mockRTopic, times(1)).publish(request);
+        verify(mockRTopic, times(1)).publish(anyString());
     }
 
     /**

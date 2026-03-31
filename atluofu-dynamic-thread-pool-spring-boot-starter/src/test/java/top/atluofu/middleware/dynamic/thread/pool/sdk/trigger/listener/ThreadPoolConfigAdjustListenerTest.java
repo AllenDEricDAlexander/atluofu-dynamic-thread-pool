@@ -1,5 +1,6 @@
 package top.atluofu.middleware.dynamic.thread.pool.sdk.trigger.listener;
 
+import com.alibaba.fastjson2.JSON;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -38,21 +39,17 @@ public class ThreadPoolConfigAdjustListenerTest {
      */
     @Test
     public void test_onMessage_AdjustConfig() {
-        // 准备测试数据
         ThreadPoolConfigEntity configEntity = new ThreadPoolConfigEntity("test-app", "threadPoolExecutor01");
         configEntity.setCorePoolSize(20);
         configEntity.setMaximumPoolSize(50);
 
-        // 模拟服务返回
         List<ThreadPoolConfigEntity> mockList = new ArrayList<>();
         mockList.add(configEntity);
         when(mockThreadPoolService.queryThreadPoolList()).thenReturn(mockList);
         when(mockThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01")).thenReturn(configEntity);
 
-        // 执行监听
-        listener.onMessage("test-channel", configEntity);
+        listener.onRawMessage(JSON.toJSONString(configEntity));
 
-        // 验证服务方法被调用
         ArgumentCaptor<ThreadPoolConfigEntity> captor = ArgumentCaptor.forClass(ThreadPoolConfigEntity.class);
         verify(mockThreadPoolService, times(1)).updateThreadPoolConfig(captor.capture());
 
@@ -75,9 +72,8 @@ public class ThreadPoolConfigAdjustListenerTest {
         when(mockThreadPoolService.queryThreadPoolList()).thenReturn(mockList);
         when(mockThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01")).thenReturn(configEntity);
 
-        listener.onMessage("test-channel", configEntity);
+        listener.onRawMessage(JSON.toJSONString(configEntity));
 
-        // 验证上报方法被调用（按应用名上报）
         verify(mockRegistry, times(1)).reportThreadPoolByApp(eq("test-app"), eq(mockList));
         verify(mockRegistry, times(1)).reportThreadPoolConfigParameter(configEntity);
     }
@@ -88,19 +84,17 @@ public class ThreadPoolConfigAdjustListenerTest {
     @Test
     public void test_onMessage_LogFieldCorrect() {
         ThreadPoolConfigEntity configEntity = new ThreadPoolConfigEntity("test-app", "threadPoolExecutor01");
-        configEntity.setCorePoolSize(30);  // 设置核心线程数
+        configEntity.setCorePoolSize(30);
         configEntity.setMaximumPoolSize(60);
-        configEntity.setPoolSize(10);  // 设置池中线程数（不应该用于日志）
+        configEntity.setPoolSize(10);
 
         List<ThreadPoolConfigEntity> mockList = new ArrayList<>();
         mockList.add(configEntity);
         when(mockThreadPoolService.queryThreadPoolList()).thenReturn(mockList);
         when(mockThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01")).thenReturn(configEntity);
 
-        // 执行时不应该抛出异常，日志应该使用 corePoolSize 而不是 poolSize
-        listener.onMessage("test-channel", configEntity);
+        listener.onRawMessage(JSON.toJSONString(configEntity));
 
-        // 验证 updateThreadPoolConfig 被调用时使用的是 corePoolSize
         ArgumentCaptor<ThreadPoolConfigEntity> captor = ArgumentCaptor.forClass(ThreadPoolConfigEntity.class);
         verify(mockThreadPoolService).updateThreadPoolConfig(captor.capture());
         assertEquals("应该使用 corePoolSize", 30, captor.getValue().getCorePoolSize());
@@ -115,7 +109,6 @@ public class ThreadPoolConfigAdjustListenerTest {
         requestConfig.setCorePoolSize(30);
         requestConfig.setMaximumPoolSize(60);
 
-        // 模拟查询返回的实际数据（可能包含更多状态信息）
         ThreadPoolConfigEntity currentConfig = new ThreadPoolConfigEntity("test-app", "threadPoolExecutor01");
         currentConfig.setCorePoolSize(30);
         currentConfig.setMaximumPoolSize(60);
@@ -127,9 +120,8 @@ public class ThreadPoolConfigAdjustListenerTest {
         when(mockThreadPoolService.queryThreadPoolList()).thenReturn(mockList);
         when(mockThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01")).thenReturn(currentConfig);
 
-        listener.onMessage("test-channel", requestConfig);
+        listener.onRawMessage(JSON.toJSONString(requestConfig));
 
-        // 验证上报的是查询到的最新数据，而不是请求数据
         ArgumentCaptor<ThreadPoolConfigEntity> reportCaptor = ArgumentCaptor.forClass(ThreadPoolConfigEntity.class);
         verify(mockRegistry).reportThreadPoolConfigParameter(reportCaptor.capture());
 

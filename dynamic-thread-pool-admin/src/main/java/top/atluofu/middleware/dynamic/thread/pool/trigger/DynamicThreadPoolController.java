@@ -18,7 +18,6 @@ import top.atluofu.middleware.dynamic.thread.pool.types.Response;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @RestController()
@@ -38,6 +37,13 @@ public class DynamicThreadPoolController {
     public Response<List<ThreadPoolConfigEntity>> queryThreadPoolList() {
         try {
             RMap<String, String> map = redissonClient.getMap("THREAD_POOL_CONFIG_LIST_KEY");
+            if (map == null) {
+                return Response.<List<ThreadPoolConfigEntity>>builder()
+                        .code(Response.Code.SUCCESS.getCode())
+                        .info(Response.Code.SUCCESS.getInfo())
+                        .data(new ArrayList<>())
+                        .build();
+            }
             List<ThreadPoolConfigEntity> result = new ArrayList<>();
             for (String json : map.values()) {
                 if (json != null && !json.isEmpty()) {
@@ -126,8 +132,10 @@ public class DynamicThreadPoolController {
     public Response<Boolean> updateThreadPoolConfig(@RequestBody ThreadPoolConfigEntity request) {
         try {
             log.info("修改线程池配置开始 {} {} {}", request.getAppName(), request.getThreadPoolName(), JSON.toJSONString(request));
-            RTopic topic = redissonClient.getTopic("DYNAMIC_THREAD_POOL_REDIS_TOPIC" + "_" + request.getAppName());
-            topic.publish(request);
+            // 发布原始 JSON 字符串，避免两端 JsonJacksonCodec @type 兼容性问题
+            String topicName = "DYNAMIC_THREAD_POOL_REDIS_TOPIC" + "_" + request.getAppName();
+            RTopic topic = redissonClient.getTopic(topicName);
+            topic.publish(JSON.toJSONString(request));
             log.info("修改线程池配置完成 {} {}", request.getAppName(), request.getThreadPoolName());
             return Response.<Boolean>builder()
                     .code(Response.Code.SUCCESS.getCode())

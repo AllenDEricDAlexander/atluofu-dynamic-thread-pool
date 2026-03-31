@@ -35,19 +35,45 @@ public class ThreadPoolConfigAdjustListener implements MessageListener<ThreadPoo
         this.registry = registry;
     }
 
+    /**
+     * 实现接口方法，但实际业务逻辑由 onRawMessage 处理
+     */
     @Override
-    public void onMessage(CharSequence charSequence, ThreadPoolConfigEntity threadPoolConfigEntity) {
+    public void onMessage(CharSequence channel, ThreadPoolConfigEntity msg) {
+        // 此方法不会被直接调用，由 AutoConfig 注册的 addListener(String.class) 回调 onRawMessage
+    }
+
+    /**
+     * 接收原始 JSON 字符串，由 AutoConfig 通过 addListener(String.class) 注册
+     */
+    public void onRawMessage(String json) {
         try {
-            logger.info("动态线程池，收到配置变更消息。线程池名称:{} 核心线程数:{} 最大线程数:{}", 
-                threadPoolConfigEntity.getThreadPoolName(), 
-                threadPoolConfigEntity.getCorePoolSize(), 
-                threadPoolConfigEntity.getMaximumPoolSize());
-            
-            // 1. 先更新线程池配置
+            ThreadPoolConfigEntity threadPoolConfigEntity = JSON.parseObject(json, ThreadPoolConfigEntity.class);
+
+            int corePoolSize = threadPoolConfigEntity.getCorePoolSize();
+            int maximumPoolSize = threadPoolConfigEntity.getMaximumPoolSize();
+
+            logger.info("动态线程池，收到配置变更消息。线程池名称:{} 核心线程数:{} 最大线程数:{}",
+                threadPoolConfigEntity.getThreadPoolName(), corePoolSize, maximumPoolSize);
+
+            if (threadPoolConfigEntity.getThreadPoolName() == null) {
+                logger.error("动态线程池，线程池名称为空。JSON:{}", json);
+                return;
+            }
+            if (corePoolSize <= 0 || maximumPoolSize <= 0) {
+                logger.error("动态线程池，配置变更参数无效。corePoolSize={}, maximumPoolSize={}", corePoolSize, maximumPoolSize);
+                return;
+            }
+            if (corePoolSize > maximumPoolSize) {
+                logger.error("动态线程池，配置变更参数无效。核心线程数({})不能大于最大线程数({})", corePoolSize, maximumPoolSize);
+                return;
+            }
+
+            // 1. 更新线程池配置
             dynamicThreadPoolService.updateThreadPoolConfig(threadPoolConfigEntity);
             logger.info("动态线程池，配置更新完成。线程池名称:{}", threadPoolConfigEntity.getThreadPoolName());
 
-            // 2. 无论更新是否成功，都按应用名上报最新数据（原子 Hash 操作，不影响其他应用）
+            // 2. 按应用名上报最新数据
             List<ThreadPoolConfigEntity> threadPoolConfigEntities = dynamicThreadPoolService.queryThreadPoolList();
             registry.reportThreadPoolByApp(applicationName, threadPoolConfigEntities);
             logger.info("动态线程池，上报线程池列表完成。应用:{} 数量:{}", applicationName, threadPoolConfigEntities.size());
@@ -57,12 +83,9 @@ public class ThreadPoolConfigAdjustListener implements MessageListener<ThreadPoo
                 threadPoolConfigEntity.getThreadPoolName());
             registry.reportThreadPoolConfigParameter(currentConfig);
             logger.info("动态线程池，上报线程池配置完成。{}", JSON.toJSONString(currentConfig));
-            
+
         } catch (Exception e) {
-            logger.error("动态线程池，配置变更处理失败。线程池名称:{}", 
-                threadPoolConfigEntity.getThreadPoolName(), e);
-            
-            // 4. 即使出错也要按应用名上报当前状态，保证监控不中断
+            logger.error("动态线程池，配置变更处理失败。原始JSON:{}", json, e);
             try {
                 List<ThreadPoolConfigEntity> entities = dynamicThreadPoolService.queryThreadPoolList();
                 registry.reportThreadPoolByApp(applicationName, entities);

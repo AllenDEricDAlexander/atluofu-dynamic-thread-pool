@@ -90,7 +90,16 @@ public class DynamicThreadPoolService implements IDynamicThreadPoolService {
         // 参数验证
         int corePoolSize = threadPoolConfigEntity.getCorePoolSize();
         int maximumPoolSize = threadPoolConfigEntity.getMaximumPoolSize();
-        
+
+        logger.info("动态线程池，配置更新前。线程池:{} 当前JDK-corePoolSize:{} 当前JDK-maxPoolSize:{} 当前队列类型:{} 当前队列size:{} 当前队列remaining:{} 请求-core:{} 请求-max:{}",
+            threadPoolConfigEntity.getThreadPoolName(),
+            threadPoolExecutor.getCorePoolSize(),
+            threadPoolExecutor.getMaximumPoolSize(),
+            threadPoolExecutor.getQueue().getClass().getSimpleName(),
+            threadPoolExecutor.getQueue().size(),
+            threadPoolExecutor.getQueue().remainingCapacity(),
+            corePoolSize, maximumPoolSize);
+
         if (corePoolSize <= 0) {
             logger.error("动态线程池，配置更新失败。核心线程数必须大于 0: {}", corePoolSize);
             return;
@@ -104,9 +113,9 @@ public class DynamicThreadPoolService implements IDynamicThreadPoolService {
             return;
         }
 
-        // 设置参数「调整核心线程数和最大线程数」
-        threadPoolExecutor.setCorePoolSize(corePoolSize);
+        // JDK 要求 corePoolSize <= maximumPoolSize，必须先调大 maximum，再调 corePoolSize
         threadPoolExecutor.setMaximumPoolSize(maximumPoolSize);
+        threadPoolExecutor.setCorePoolSize(corePoolSize);
         logger.info("动态线程池，配置更新成功。线程池名称：{}, 核心线程数：{}, 最大线程数：{}", 
             threadPoolConfigEntity.getThreadPoolName(), corePoolSize, maximumPoolSize);
     }
