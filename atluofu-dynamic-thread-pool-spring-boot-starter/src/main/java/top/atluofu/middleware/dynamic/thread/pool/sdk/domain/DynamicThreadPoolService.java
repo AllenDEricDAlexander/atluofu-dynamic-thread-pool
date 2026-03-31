@@ -113,9 +113,19 @@ public class DynamicThreadPoolService implements IDynamicThreadPoolService {
             return;
         }
 
-        // JDK 要求 corePoolSize <= maximumPoolSize，必须先调大 maximum，再调 corePoolSize
-        threadPoolExecutor.setMaximumPoolSize(maximumPoolSize);
-        threadPoolExecutor.setCorePoolSize(corePoolSize);
+        // JDK ThreadPoolExecutor 内部校验规则：
+        //   setMaximumPoolSize(x)  要求 x >= currentCorePoolSize（否则抛 IllegalArgumentException）
+        //   setCorePoolSize(x)     要求 x <= currentMaximumPoolSize
+        // 正确顺序：优先将 core 和 max 调整到互不冲突的范围，再做最终设置
+        if (corePoolSize > threadPoolExecutor.getMaximumPoolSize()) {
+            // 场景：newCore > currentMax（如从 200 改到 77），必须先调大 max 再设 core
+            threadPoolExecutor.setMaximumPoolSize(maximumPoolSize);
+            threadPoolExecutor.setCorePoolSize(corePoolSize);
+        } else {
+            // 场景：newMax < currentCore（如从 100 改到 88），必须先缩小 core 再调 max
+            threadPoolExecutor.setCorePoolSize(corePoolSize);
+            threadPoolExecutor.setMaximumPoolSize(maximumPoolSize);
+        }
         logger.info("动态线程池，配置更新成功。线程池名称：{}, 核心线程数：{}, 最大线程数：{}", 
             threadPoolConfigEntity.getThreadPoolName(), corePoolSize, maximumPoolSize);
     }

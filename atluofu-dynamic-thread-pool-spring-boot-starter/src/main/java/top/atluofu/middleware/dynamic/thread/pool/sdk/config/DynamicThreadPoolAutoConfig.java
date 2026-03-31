@@ -143,8 +143,16 @@ public class DynamicThreadPoolAutoConfig {
                 continue;
             }
             ThreadPoolExecutor threadPoolExecutor = threadPoolExecutorMap.get(threadPoolKey);
-            threadPoolExecutor.setCorePoolSize(threadPoolConfigEntity.getCorePoolSize());
-            threadPoolExecutor.setMaximumPoolSize(threadPoolConfigEntity.getMaximumPoolSize());
+            int cachedCore = threadPoolConfigEntity.getCorePoolSize();
+            int cachedMax = threadPoolConfigEntity.getMaximumPoolSize();
+            // JDK 校验：setMaximumPoolSize 要求 x >= currentCore，setCorePoolSize 要求 x <= currentMax
+            if (cachedCore > threadPoolExecutor.getMaximumPoolSize()) {
+                threadPoolExecutor.setMaximumPoolSize(cachedMax);
+                threadPoolExecutor.setCorePoolSize(cachedCore);
+            } else {
+                threadPoolExecutor.setCorePoolSize(cachedCore);
+                threadPoolExecutor.setMaximumPoolSize(cachedMax);
+            }
         }
 
         return new DynamicThreadPoolService(dynamicThreadPoolApplicationName, threadPoolExecutorMap);
