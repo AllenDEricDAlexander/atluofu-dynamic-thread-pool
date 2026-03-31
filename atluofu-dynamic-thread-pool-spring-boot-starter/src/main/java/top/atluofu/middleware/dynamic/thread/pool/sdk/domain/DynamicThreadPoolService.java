@@ -42,6 +42,7 @@ public class DynamicThreadPoolService implements IDynamicThreadPoolService {
             threadPoolConfigVO.setQueueType(threadPoolExecutor.getQueue().getClass().getSimpleName());
             threadPoolConfigVO.setQueueSize(threadPoolExecutor.getQueue().size());
             threadPoolConfigVO.setRemainingCapacity(threadPoolExecutor.getQueue().remainingCapacity());
+            threadPoolConfigVO.setTimestamp(System.currentTimeMillis());
             threadPoolVOS.add(threadPoolConfigVO);
         }
         return threadPoolVOS;
@@ -65,6 +66,7 @@ public class DynamicThreadPoolService implements IDynamicThreadPoolService {
         threadPoolConfigVO.setQueueType(threadPoolExecutor.getQueue().getClass().getSimpleName());
         threadPoolConfigVO.setQueueSize(threadPoolExecutor.getQueue().size());
         threadPoolConfigVO.setRemainingCapacity(threadPoolExecutor.getQueue().remainingCapacity());
+        threadPoolConfigVO.setTimestamp(System.currentTimeMillis());
 
         if (logger.isDebugEnabled()) {
             logger.info("动态线程池，配置查询 应用名:{} 线程名:{} 池化配置:{}", applicationName, threadPoolName, JSON.toJSONString(threadPoolConfigVO));

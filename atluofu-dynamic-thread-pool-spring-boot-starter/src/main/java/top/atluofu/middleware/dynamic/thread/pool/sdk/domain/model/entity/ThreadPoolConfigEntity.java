@@ -52,7 +52,16 @@ public class ThreadPoolConfigEntity {
      */
     private int remainingCapacity;
 
+    /**
+     * 数据时间戳（毫秒），用于判断数据新鲜度
+     */
+    private long timestamp;
+
     public ThreadPoolConfigEntity() {
+    }
+
+    public void setAppName(String appName) {
+        this.appName = appName;
     }
 
     public ThreadPoolConfigEntity(String appName, String threadPoolName) {
@@ -122,6 +131,14 @@ public class ThreadPoolConfigEntity {
 
     public void setRemainingCapacity(int remainingCapacity) {
         this.remainingCapacity = remainingCapacity;
+    }
+
+    public long getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
     }
 
 }

@@ -1,7 +1,18 @@
 import request from '@/utils/request'
 
 /**
- * 查询线程池列表
+ * 按应用名查询线程池列表（推荐，解决数据窗口期问题）
+ */
+export function queryThreadPoolListByApp(appName) {
+  return request({
+    url: '/query_thread_pool_list_by_app',
+    method: 'get',
+    params: { appName }
+  })
+}
+
+/**
+ * 查询线程池列表（兼容旧接口）
  */
 export function queryThreadPoolList() {
   return request({

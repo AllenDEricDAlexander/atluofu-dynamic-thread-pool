@@ -3,6 +3,7 @@ package top.atluofu.middleware.dynamic.thread.pool.sdk.registry.redis;
 import org.junit.Test;
 import org.redisson.api.RBucket;
 import org.redisson.api.RList;
+import org.redisson.api.RMap;
 import org.redisson.api.RedissonClient;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.valobj.RegistryEnumVO;
@@ -21,7 +22,30 @@ import static org.mockito.Mockito.*;
 public class RedisRegistryTest {
 
     /**
-     * 测试：上报线程池列表
+     * 测试：按应用名上报线程池列表（Hash 原子操作）
+     */
+    @Test
+    public void test_reportThreadPoolByApp() {
+        RedissonClient mockRedissonClient = mock(RedissonClient.class);
+        @SuppressWarnings("rawtypes")
+        RMap mockRMap = mock(RMap.class);
+        RedisRegistry redisRegistry = new RedisRegistry(mockRedissonClient);
+
+        ThreadPoolConfigEntity e1 = new ThreadPoolConfigEntity("app", "pool1");
+        ThreadPoolConfigEntity e2 = new ThreadPoolConfigEntity("app", "pool2");
+        List<ThreadPoolConfigEntity> list = Arrays.asList(e1, e2);
+
+        when(mockRedissonClient.getMap("THREAD_POOL_CONFIG_LIST_KEY")).thenReturn(mockRMap);
+
+        redisRegistry.reportThreadPoolByApp("app", list);
+
+        verify(mockRedissonClient, times(1)).getMap("THREAD_POOL_CONFIG_LIST_KEY");
+        verify(mockRMap, times(1)).put(eq("app"), any(String.class));
+        verify(mockRMap, times(1)).expire(1, java.util.concurrent.TimeUnit.DAYS);
+    }
+
+    /**
+     * 测试：上报线程池列表（旧接口，保持兼容）
      */
     @Test
     public void test_reportThreadPool() {

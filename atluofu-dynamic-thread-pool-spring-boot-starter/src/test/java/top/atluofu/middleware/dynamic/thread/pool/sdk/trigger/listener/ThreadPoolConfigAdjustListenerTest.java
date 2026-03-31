@@ -30,7 +30,7 @@ public class ThreadPoolConfigAdjustListenerTest {
     public void setUp() {
         mockThreadPoolService = mock(IDynamicThreadPoolService.class);
         mockRegistry = mock(IRegistry.class);
-        listener = new ThreadPoolConfigAdjustListener(mockThreadPoolService, mockRegistry);
+        listener = new ThreadPoolConfigAdjustListener("test-app", mockThreadPoolService, mockRegistry);
     }
 
     /**
@@ -77,8 +77,8 @@ public class ThreadPoolConfigAdjustListenerTest {
 
         listener.onMessage("test-channel", configEntity);
 
-        // 验证上报方法被调用
-        verify(mockRegistry, times(1)).reportThreadPool(mockList);
+        // 验证上报方法被调用（按应用名上报）
+        verify(mockRegistry, times(1)).reportThreadPoolByApp(eq("test-app"), eq(mockList));
         verify(mockRegistry, times(1)).reportThreadPoolConfigParameter(configEntity);
     }
 

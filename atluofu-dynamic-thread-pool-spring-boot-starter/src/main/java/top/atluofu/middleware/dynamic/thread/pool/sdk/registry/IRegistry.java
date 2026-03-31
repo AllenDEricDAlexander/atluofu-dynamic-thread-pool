@@ -15,6 +15,11 @@ public interface IRegistry {
 
     void reportThreadPool(List<ThreadPoolConfigEntity> threadPoolEntities);
 
+    /**
+     * 按应用名上报线程池列表（原子操作，解决数据窗口期问题）
+     */
+    void reportThreadPoolByApp(String appName, List<ThreadPoolConfigEntity> threadPoolEntities);
+
     void reportThreadPoolConfigParameter(ThreadPoolConfigEntity threadPoolConfigEntity);
 
 }

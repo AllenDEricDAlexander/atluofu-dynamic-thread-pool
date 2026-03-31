@@ -3,7 +3,7 @@ package top.atluofu.middleware.dynamic.thread.pool.trigger;
 import com.alibaba.fastjson2.JSON;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RList;
+import org.redisson.api.RMap;
 import org.redisson.api.RTopic;
 import org.redisson.api.RedissonClient;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -15,7 +15,10 @@ import org.springframework.web.bind.annotation.RestController;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
 import top.atluofu.middleware.dynamic.thread.pool.types.Response;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController()
@@ -34,14 +37,48 @@ public class DynamicThreadPoolController {
     @RequestMapping(value = "query_thread_pool_list", method = RequestMethod.GET)
     public Response<List<ThreadPoolConfigEntity>> queryThreadPoolList() {
         try {
-            RList<ThreadPoolConfigEntity> cacheList = redissonClient.getList("THREAD_POOL_CONFIG_LIST_KEY");
+            RMap<String, String> map = redissonClient.getMap("THREAD_POOL_CONFIG_LIST_KEY");
+            List<ThreadPoolConfigEntity> result = new ArrayList<>();
+            for (String json : map.values()) {
+                if (json != null && !json.isEmpty()) {
+                    result.addAll(JSON.parseArray(json, ThreadPoolConfigEntity.class));
+                }
+            }
             return Response.<List<ThreadPoolConfigEntity>>builder()
                     .code(Response.Code.SUCCESS.getCode())
                     .info(Response.Code.SUCCESS.getInfo())
-                    .data(cacheList.readAll())
+                    .data(result)
                     .build();
         } catch (Exception e) {
             log.error("查询线程池数据异常", e);
+            return Response.<List<ThreadPoolConfigEntity>>builder()
+                    .code(Response.Code.UN_ERROR.getCode())
+                    .info(Response.Code.UN_ERROR.getInfo())
+                    .build();
+        }
+    }
+
+    /**
+     * 按应用名查询线程池数据（推荐，用于解决数据窗口期问题）
+     * curl --request GET \
+     * --url 'http://localhost:8089/api/v1/dynamic/thread/pool/query_thread_pool_list_by_app?appName=dynamic-thread-pool-test-app'
+     */
+    @RequestMapping(value = "query_thread_pool_list_by_app", method = RequestMethod.GET)
+    public Response<List<ThreadPoolConfigEntity>> queryThreadPoolListByApp(@RequestParam String appName) {
+        try {
+            RMap<String, String> map = redissonClient.getMap("THREAD_POOL_CONFIG_LIST_KEY");
+            String json = map.get(appName);
+            List<ThreadPoolConfigEntity> data = Collections.emptyList();
+            if (json != null && !json.isEmpty()) {
+                data = JSON.parseArray(json, ThreadPoolConfigEntity.class);
+            }
+            return Response.<List<ThreadPoolConfigEntity>>builder()
+                    .code(Response.Code.SUCCESS.getCode())
+                    .info(Response.Code.SUCCESS.getInfo())
+                    .data(data)
+                    .build();
+        } catch (Exception e) {
+            log.error("按应用名查询线程池数据异常 appName={}", appName, e);
             return Response.<List<ThreadPoolConfigEntity>>builder()
                     .code(Response.Code.UN_ERROR.getCode())
                     .info(Response.Code.UN_ERROR.getInfo())

@@ -23,11 +23,14 @@ public class ThreadPoolConfigAdjustListener implements MessageListener<ThreadPoo
 
     private final Logger logger = LoggerFactory.getLogger(ThreadPoolConfigAdjustListener.class);
 
+    private final String applicationName;
+
     private final IDynamicThreadPoolService dynamicThreadPoolService;
 
     private final IRegistry registry;
 
-    public ThreadPoolConfigAdjustListener(IDynamicThreadPoolService dynamicThreadPoolService, IRegistry registry) {
+    public ThreadPoolConfigAdjustListener(String applicationName, IDynamicThreadPoolService dynamicThreadPoolService, IRegistry registry) {
+        this.applicationName = applicationName;
         this.dynamicThreadPoolService = dynamicThreadPoolService;
         this.registry = registry;
     }
@@ -44,10 +47,10 @@ public class ThreadPoolConfigAdjustListener implements MessageListener<ThreadPoo
             dynamicThreadPoolService.updateThreadPoolConfig(threadPoolConfigEntity);
             logger.info("动态线程池，配置更新完成。线程池名称:{}", threadPoolConfigEntity.getThreadPoolName());
 
-            // 2. 无论更新是否成功，都上报最新数据（保证数据不丢失）
+            // 2. 无论更新是否成功，都按应用名上报最新数据（原子 Hash 操作，不影响其他应用）
             List<ThreadPoolConfigEntity> threadPoolConfigEntities = dynamicThreadPoolService.queryThreadPoolList();
-            registry.reportThreadPool(threadPoolConfigEntities);
-            logger.info("动态线程池，上报线程池列表完成。数量:{}", threadPoolConfigEntities.size());
+            registry.reportThreadPoolByApp(applicationName, threadPoolConfigEntities);
+            logger.info("动态线程池，上报线程池列表完成。应用:{} 数量:{}", applicationName, threadPoolConfigEntities.size());
 
             // 3. 上报单个线程池配置
             ThreadPoolConfigEntity currentConfig = dynamicThreadPoolService.queryThreadPoolConfigByName(
@@ -59,11 +62,11 @@ public class ThreadPoolConfigAdjustListener implements MessageListener<ThreadPoo
             logger.error("动态线程池，配置变更处理失败。线程池名称:{}", 
                 threadPoolConfigEntity.getThreadPoolName(), e);
             
-            // 4. 即使出错也要上报当前状态，保证监控不中断
+            // 4. 即使出错也要按应用名上报当前状态，保证监控不中断
             try {
                 List<ThreadPoolConfigEntity> entities = dynamicThreadPoolService.queryThreadPoolList();
-                registry.reportThreadPool(entities);
-                logger.warn("动态线程池，异常后上报当前状态。数量:{}", entities.size());
+                registry.reportThreadPoolByApp(applicationName, entities);
+                logger.warn("动态线程池，异常后上报当前状态。应用:{} 数量:{}", applicationName, entities.size());
             } catch (Exception ex) {
                 logger.error("动态线程池，异常后上报状态也失败", ex);
             }

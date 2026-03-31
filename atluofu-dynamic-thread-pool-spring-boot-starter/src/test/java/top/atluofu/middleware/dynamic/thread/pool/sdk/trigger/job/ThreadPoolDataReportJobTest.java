@@ -22,10 +22,10 @@ public class ThreadPoolDataReportJobTest {
     public void test_execReportThreadPoolList_Success() {
         IDynamicThreadPoolService mockDynamicThreadPoolService = mock(IDynamicThreadPoolService.class);
         IRegistry mockRegistry = mock(IRegistry.class);
-        ThreadPoolDataReportJob job = new ThreadPoolDataReportJob(mockDynamicThreadPoolService, mockRegistry);
+        ThreadPoolDataReportJob job = new ThreadPoolDataReportJob("test-app", mockDynamicThreadPoolService, mockRegistry);
 
-        ThreadPoolConfigEntity e1 = new ThreadPoolConfigEntity("app", "pool1");
-        ThreadPoolConfigEntity e2 = new ThreadPoolConfigEntity("app", "pool2");
+        ThreadPoolConfigEntity e1 = new ThreadPoolConfigEntity("test-app", "pool1");
+        ThreadPoolConfigEntity e2 = new ThreadPoolConfigEntity("test-app", "pool2");
         List<ThreadPoolConfigEntity> list = Arrays.asList(e1, e2);
 
         when(mockDynamicThreadPoolService.queryThreadPoolList()).thenReturn(list);
@@ -33,7 +33,7 @@ public class ThreadPoolDataReportJobTest {
         job.execReportThreadPoolList();
 
         verify(mockDynamicThreadPoolService, times(1)).queryThreadPoolList();
-        verify(mockRegistry, times(1)).reportThreadPool(list);
+        verify(mockRegistry, times(1)).reportThreadPoolByApp(eq("test-app"), eq(list));
         verify(mockRegistry, times(1)).reportThreadPoolConfigParameter(e1);
         verify(mockRegistry, times(1)).reportThreadPoolConfigParameter(e2);
     }
@@ -45,7 +45,7 @@ public class ThreadPoolDataReportJobTest {
     public void test_execReportThreadPoolList_QueryException() {
         IDynamicThreadPoolService mockDynamicThreadPoolService = mock(IDynamicThreadPoolService.class);
         IRegistry mockRegistry = mock(IRegistry.class);
-        ThreadPoolDataReportJob job = new ThreadPoolDataReportJob(mockDynamicThreadPoolService, mockRegistry);
+        ThreadPoolDataReportJob job = new ThreadPoolDataReportJob("test-app", mockDynamicThreadPoolService, mockRegistry);
 
         when(mockDynamicThreadPoolService.queryThreadPoolList())
                 .thenThrow(new RuntimeException("query error"));
@@ -63,10 +63,10 @@ public class ThreadPoolDataReportJobTest {
     public void test_execReportThreadPoolList_SingleReportFail() {
         IDynamicThreadPoolService mockDynamicThreadPoolService = mock(IDynamicThreadPoolService.class);
         IRegistry mockRegistry = mock(IRegistry.class);
-        ThreadPoolDataReportJob job = new ThreadPoolDataReportJob(mockDynamicThreadPoolService, mockRegistry);
+        ThreadPoolDataReportJob job = new ThreadPoolDataReportJob("test-app", mockDynamicThreadPoolService, mockRegistry);
 
-        ThreadPoolConfigEntity e1 = new ThreadPoolConfigEntity("app", "pool1");
-        ThreadPoolConfigEntity e2 = new ThreadPoolConfigEntity("app", "pool2");
+        ThreadPoolConfigEntity e1 = new ThreadPoolConfigEntity("test-app", "pool1");
+        ThreadPoolConfigEntity e2 = new ThreadPoolConfigEntity("test-app", "pool2");
         List<ThreadPoolConfigEntity> list = Arrays.asList(e1, e2);
 
         when(mockDynamicThreadPoolService.queryThreadPoolList()).thenReturn(list);
@@ -75,7 +75,7 @@ public class ThreadPoolDataReportJobTest {
 
         job.execReportThreadPoolList();
 
-        verify(mockRegistry, times(1)).reportThreadPool(list);
+        verify(mockRegistry, times(1)).reportThreadPoolByApp(eq("test-app"), eq(list));
         verify(mockRegistry, times(1)).reportThreadPoolConfigParameter(e1);
         verify(mockRegistry, times(1)).reportThreadPoolConfigParameter(e2);
     }

@@ -21,11 +21,14 @@ public class ThreadPoolDataReportJob {
 
     private final Logger logger = LoggerFactory.getLogger(ThreadPoolDataReportJob.class);
 
+    private final String applicationName;
+
     private final IDynamicThreadPoolService dynamicThreadPoolService;
 
     private final IRegistry registry;
 
-    public ThreadPoolDataReportJob(IDynamicThreadPoolService dynamicThreadPoolService, IRegistry registry) {
+    public ThreadPoolDataReportJob(String applicationName, IDynamicThreadPoolService dynamicThreadPoolService, IRegistry registry) {
+        this.applicationName = applicationName;
         this.dynamicThreadPoolService = dynamicThreadPoolService;
         this.registry = registry;
     }
@@ -36,9 +39,9 @@ public class ThreadPoolDataReportJob {
             // 1. 查询所有线程池状态
             List<ThreadPoolConfigEntity> threadPoolConfigEntities = dynamicThreadPoolService.queryThreadPoolList();
             
-            // 2. 上报线程池列表
-            registry.reportThreadPool(threadPoolConfigEntities);
-            logger.info("动态线程池，定时上报线程池列表。数量:{}", threadPoolConfigEntities.size());
+            // 2. 按应用名上报线程池列表（原子 Hash 操作，不会影响其他应用数据）
+            registry.reportThreadPoolByApp(applicationName, threadPoolConfigEntities);
+            logger.info("动态线程池，定时上报线程池列表。应用:{} 数量:{}", applicationName, threadPoolConfigEntities.size());
 
             // 3. 逐个上报线程池配置（单个失败不影响其他）
             for (ThreadPoolConfigEntity threadPoolConfigEntity : threadPoolConfigEntities) {

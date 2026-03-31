@@ -32,7 +32,13 @@
               <el-icon><List /></el-icon>
               线程池列表
             </span>
-            <el-tag type="info">共 {{ total }} 个线程池</el-tag>
+            <div class="header-right">
+              <el-tag v-if="dataState === 'stale'" type="warning" effect="plain" size="small">
+                <el-icon><Warning /></el-icon>
+                数据可能已过期，请等待上报
+              </el-tag>
+              <el-tag type="info">共 {{ total }} 个线程池</el-tag>
+            </div>
           </div>
         </template>
 
@@ -133,6 +139,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { queryThreadPoolList, queryThreadPoolConfig, updateThreadPoolConfig } from '@/api/threadPool'
+import { Monitor, List, Edit, Refresh, VideoPlay, VideoPause, Warning } from '@element-plus/icons-vue'
 
 // 数据
 const threadPoolList = ref([])
@@ -142,6 +149,10 @@ const autoRefresh = ref(false)
 const autoRefreshInterval = ref(null)
 const editDialogVisible = ref(false)
 const updating = ref(false)
+
+// 数据状态
+const dataState = ref('loading') // 'loading' | 'normal' | 'stale'
+const lastFetchTime = ref(0)
 
 const editForm = ref({
   appName: '',
@@ -175,10 +186,20 @@ const fetchData = async () => {
   loading.value = true
   try {
     const res = await queryThreadPoolList()
-    threadPoolList.value = res.data || []
-    total.value = threadPoolList.value.length
+    const newData = res.data || []
+    lastFetchTime.value = Date.now()
+    if (newData.length > 0) {
+      threadPoolList.value = newData
+      total.value = newData.length
+      dataState.value = 'normal'
+    } else {
+      // 数据为空时保留上一次状态，显示"数据过期"提示
+      dataState.value = 'stale'
+    }
   } catch (error) {
     console.error('获取数据失败', error)
+    // 请求失败时保留上一次数据
+    dataState.value = 'stale'
   } finally {
     loading.value = false
   }
@@ -317,6 +338,14 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .card-title {
