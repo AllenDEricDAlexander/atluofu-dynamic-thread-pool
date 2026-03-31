@@ -4,7 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.annotation.EnableAsync;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -16,11 +15,10 @@ import java.util.concurrent.TimeUnit;
  * @ClassName: ThreadPoolConfig
  * @description: ThreadPoolConfig
  * @author: 有罗敷的马同学
- * @datetime: 2025Year-04Month-13Day-上午8:42
+ * @datetime: 2025Year-04Month-13Day-上午 8:42
  * @Version: 1.0
  */
 @Slf4j
-@EnableAsync
 @Configuration
 @EnableConfigurationProperties(ThreadPoolConfigProperties.class)
 public class ThreadPoolConfig {

@@ -14,7 +14,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 /**
  * @author 有罗敷的马同学
  * @description 动态线程池服务
- * @Date 上午8:56 2025/4/13
+ * @Date 上午 8:56 2025/4/13
  **/
 public class DynamicThreadPoolService implements IDynamicThreadPoolService {
 
@@ -50,7 +50,11 @@ public class DynamicThreadPoolService implements IDynamicThreadPoolService {
     @Override
     public ThreadPoolConfigEntity queryThreadPoolConfigByName(String threadPoolName) {
         ThreadPoolExecutor threadPoolExecutor = threadPoolExecutorMap.get(threadPoolName);
-        if (null == threadPoolExecutor) return new ThreadPoolConfigEntity(applicationName, threadPoolName);
+        if (null == threadPoolExecutor) {
+            ThreadPoolConfigEntity emptyEntity = new ThreadPoolConfigEntity(applicationName, threadPoolName);
+            logger.warn("动态线程池，未找到线程池配置。应用名:{} 线程名:{}", applicationName, threadPoolName);
+            return emptyEntity;
+        }
 
         // 线程池配置数据
         ThreadPoolConfigEntity threadPoolConfigVO = new ThreadPoolConfigEntity(applicationName, threadPoolName);
@@ -71,13 +75,38 @@ public class DynamicThreadPoolService implements IDynamicThreadPoolService {
 
     @Override
     public void updateThreadPoolConfig(ThreadPoolConfigEntity threadPoolConfigEntity) {
-        if (null == threadPoolConfigEntity || !applicationName.equals(threadPoolConfigEntity.getAppName())) return;
+        if (null == threadPoolConfigEntity || !applicationName.equals(threadPoolConfigEntity.getAppName())) {
+            logger.warn("动态线程池，配置更新被忽略。配置为空或应用名不匹配：{}", threadPoolConfigEntity);
+            return;
+        }
         ThreadPoolExecutor threadPoolExecutor = threadPoolExecutorMap.get(threadPoolConfigEntity.getThreadPoolName());
-        if (null == threadPoolExecutor) return;
+        if (null == threadPoolExecutor) {
+            logger.warn("动态线程池，配置更新被忽略。线程池不存在：{}", threadPoolConfigEntity.getThreadPoolName());
+            return;
+        }
 
-        // 设置参数 「调整核心线程数和最大线程数」
-        threadPoolExecutor.setCorePoolSize(threadPoolConfigEntity.getCorePoolSize());
-        threadPoolExecutor.setMaximumPoolSize(threadPoolConfigEntity.getMaximumPoolSize());
+        // 参数验证
+        int corePoolSize = threadPoolConfigEntity.getCorePoolSize();
+        int maximumPoolSize = threadPoolConfigEntity.getMaximumPoolSize();
+        
+        if (corePoolSize <= 0) {
+            logger.error("动态线程池，配置更新失败。核心线程数必须大于 0: {}", corePoolSize);
+            return;
+        }
+        if (maximumPoolSize <= 0) {
+            logger.error("动态线程池，配置更新失败。最大线程数必须大于 0: {}", maximumPoolSize);
+            return;
+        }
+        if (corePoolSize > maximumPoolSize) {
+            logger.error("动态线程池，配置更新失败。核心线程数 ({}) 不能大于最大线程数 ({})", corePoolSize, maximumPoolSize);
+            return;
+        }
+
+        // 设置参数「调整核心线程数和最大线程数」
+        threadPoolExecutor.setCorePoolSize(corePoolSize);
+        threadPoolExecutor.setMaximumPoolSize(maximumPoolSize);
+        logger.info("动态线程池，配置更新成功。线程池名称：{}, 核心线程数：{}, 最大线程数：{}", 
+            threadPoolConfigEntity.getThreadPoolName(), corePoolSize, maximumPoolSize);
     }
 
 }

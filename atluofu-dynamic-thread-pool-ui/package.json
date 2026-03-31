@@ -1,0 +1,23 @@
+{
+  "name": "atluofu-dynamic-thread-pool-ui",
+  "version": "1.0.0",
+  "description": "动态线程池可视化管理平台",
+  "author": "atluofu",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.3.4",
+    "vue-router": "^4.2.4",
+    "element-plus": "^2.3.14",
+    "axios": "^1.5.0",
+    "@element-plus/icons-vue": "^2.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.3.4",
+    "vite": "^4.4.9"
+  }
+}
