@@ -32,10 +32,12 @@ public interface IRegistry {
 
     @Deprecated
     default void reportThreadPool(List<ThreadPoolConfigEntity> threadPoolEntities) {
+        throw new UnsupportedOperationException("reportThreadPool is deprecated; implement reportSnapshots instead");
     }
 
     @Deprecated
     default void reportThreadPoolConfigParameter(ThreadPoolConfigEntity threadPoolConfigEntity) {
+        throw new UnsupportedOperationException("reportThreadPoolConfigParameter is deprecated; implement reportSnapshot instead");
     }
 
 }

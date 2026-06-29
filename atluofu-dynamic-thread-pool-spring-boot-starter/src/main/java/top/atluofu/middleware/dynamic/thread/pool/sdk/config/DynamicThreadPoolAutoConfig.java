@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.redisson.Redisson;
@@ -49,18 +50,9 @@ public class DynamicThreadPoolAutoConfig {
     @Bean("dynamicThreadRedissonClient")
     public RedissonClient redissonClient(DynamicThreadPoolAutoProperties properties) {
         Config config = new Config();
-        
-        // 创建 ObjectMapper 并配置类型信息
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.activateDefaultTyping(
-            LaissezFaireSubTypeValidator.instance,
-            ObjectMapper.DefaultTyping.NON_FINAL,
-            JsonTypeInfo.As.PROPERTY
-        );
-        objectMapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
-        
+
         // 使用自定义 ObjectMapper 的 JsonJacksonCodec
-        config.setCodec(new JsonJacksonCodec(objectMapper));
+        config.setCodec(new JsonJacksonCodec(createRedisObjectMapper()));
 
         DynamicThreadPoolAutoProperties.Redis redis = properties.getRegistry().getRedis();
         config.useSingleServer()
@@ -80,6 +72,18 @@ public class DynamicThreadPoolAutoConfig {
         RedissonClient redissonClient = Redisson.create(config);
         log.info("动态线程池，注册器（redis）链接初始化完成。{} {} {}", redis.getHost(), redis.getPoolSize(), !redissonClient.isShutdown());
         return redissonClient;
+    }
+
+    static ObjectMapper createRedisObjectMapper() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.activateDefaultTyping(
+            LaissezFaireSubTypeValidator.instance,
+            ObjectMapper.DefaultTyping.NON_FINAL,
+            JsonTypeInfo.As.PROPERTY
+        );
+        objectMapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
+        return objectMapper;
     }
 
     @Bean
