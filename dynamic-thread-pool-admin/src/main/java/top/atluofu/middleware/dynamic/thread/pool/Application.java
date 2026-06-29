@@ -50,6 +50,7 @@ public class Application {
             config.useSingleServer()
                     .setAddress("redis://" + properties.getHost() + ":" + properties.getPort())
                     .setPassword(properties.getPassword())
+                    .setDatabase(properties.getDatabase())
                     .setConnectionPoolSize(properties.getPoolSize())
                     .setConnectionMinimumIdleSize(properties.getMinIdleSize())
                     .setIdleConnectionTimeout(properties.getIdleTimeout())
@@ -67,7 +68,7 @@ public class Application {
 
 
     @Data
-    @ConfigurationProperties(prefix = "redis.sdk.config", ignoreInvalidFields = true)
+    @ConfigurationProperties(prefix = "atluofu.dynamic.thread-pool.registry.redis", ignoreInvalidFields = true)
     public static class RedisClientConfigProperties {
         /**
          * host:ip
@@ -81,6 +82,10 @@ public class Application {
          * 账密
          */
         private String password;
+        /**
+         * Redis database
+         */
+        private int database = 0;
         /**
          * 设置连接池的大小，默认为 64
          */
