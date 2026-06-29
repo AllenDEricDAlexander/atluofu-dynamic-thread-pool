@@ -2,82 +2,57 @@ package top.atluofu.middleware.dynamic.thread.pool.sdk.trigger.job;
 
 import org.junit.jupiter.api.Test;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.IDynamicThreadPoolService;
-import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ExecutorSnapshot;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.IRegistry;
 
-import java.util.Arrays;
 import java.util.List;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * @description ThreadPoolDataReportJob 单元测试
  */
 public class ThreadPoolDataReportJobTest {
 
-    /**
-     * 测试：正常上报线程池列表和配置
-     */
     @Test
-    public void test_execReportThreadPoolList_Success() {
-        IDynamicThreadPoolService mockDynamicThreadPoolService = mock(IDynamicThreadPoolService.class);
-        IRegistry mockRegistry = mock(IRegistry.class);
-        ThreadPoolDataReportJob job = new ThreadPoolDataReportJob(mockDynamicThreadPoolService, mockRegistry);
-
-        ThreadPoolConfigEntity e1 = new ThreadPoolConfigEntity("app", "pool1");
-        ThreadPoolConfigEntity e2 = new ThreadPoolConfigEntity("app", "pool2");
-        List<ThreadPoolConfigEntity> list = Arrays.asList(e1, e2);
-
-        when(mockDynamicThreadPoolService.queryThreadPoolList()).thenReturn(list);
+    public void test_execReportThreadPoolList_success() {
+        IDynamicThreadPoolService dynamicThreadPoolService = mock(IDynamicThreadPoolService.class);
+        IRegistry registry = mock(IRegistry.class);
+        ThreadPoolDataReportJob job = new ThreadPoolDataReportJob(dynamicThreadPoolService, registry);
+        ExecutorSnapshot first = buildSnapshot("pool1");
+        ExecutorSnapshot second = buildSnapshot("pool2");
+        List<ExecutorSnapshot> snapshots = List.of(first, second);
+        when(dynamicThreadPoolService.queryExecutorSnapshots()).thenReturn(snapshots);
 
         job.execReportThreadPoolList();
 
-        verify(mockDynamicThreadPoolService, times(1)).queryThreadPoolList();
-        verify(mockRegistry, times(1)).reportThreadPool(list);
-        verify(mockRegistry, times(1)).reportThreadPoolConfigParameter(e1);
-        verify(mockRegistry, times(1)).reportThreadPoolConfigParameter(e2);
+        verify(dynamicThreadPoolService, times(1)).queryExecutorSnapshots();
+        verify(registry, times(1)).reportSnapshots(snapshots);
     }
 
-    /**
-     * 测试：查询线程池列表抛异常时，方法应吞掉异常不向外抛
-     */
     @Test
-    public void test_execReportThreadPoolList_QueryException() {
-        IDynamicThreadPoolService mockDynamicThreadPoolService = mock(IDynamicThreadPoolService.class);
-        IRegistry mockRegistry = mock(IRegistry.class);
-        ThreadPoolDataReportJob job = new ThreadPoolDataReportJob(mockDynamicThreadPoolService, mockRegistry);
-
-        when(mockDynamicThreadPoolService.queryThreadPoolList())
-                .thenThrow(new RuntimeException("query error"));
+    public void test_execReportThreadPoolList_queryException() {
+        IDynamicThreadPoolService dynamicThreadPoolService = mock(IDynamicThreadPoolService.class);
+        IRegistry registry = mock(IRegistry.class);
+        ThreadPoolDataReportJob job = new ThreadPoolDataReportJob(dynamicThreadPoolService, registry);
+        when(dynamicThreadPoolService.queryExecutorSnapshots()).thenThrow(new RuntimeException("query error"));
 
         job.execReportThreadPoolList();
 
-        verify(mockDynamicThreadPoolService, times(1)).queryThreadPoolList();
-        verifyNoInteractions(mockRegistry);
+        verify(dynamicThreadPoolService, times(1)).queryExecutorSnapshots();
+        verifyNoInteractions(registry);
     }
 
-    /**
-     * 测试：单个线程池上报失败不影响其他
-     */
-    @Test
-    public void test_execReportThreadPoolList_SingleReportFail() {
-        IDynamicThreadPoolService mockDynamicThreadPoolService = mock(IDynamicThreadPoolService.class);
-        IRegistry mockRegistry = mock(IRegistry.class);
-        ThreadPoolDataReportJob job = new ThreadPoolDataReportJob(mockDynamicThreadPoolService, mockRegistry);
-
-        ThreadPoolConfigEntity e1 = new ThreadPoolConfigEntity("app", "pool1");
-        ThreadPoolConfigEntity e2 = new ThreadPoolConfigEntity("app", "pool2");
-        List<ThreadPoolConfigEntity> list = Arrays.asList(e1, e2);
-
-        when(mockDynamicThreadPoolService.queryThreadPoolList()).thenReturn(list);
-        doThrow(new RuntimeException("report error"))
-                .when(mockRegistry).reportThreadPoolConfigParameter(e1);
-
-        job.execReportThreadPoolList();
-
-        verify(mockRegistry, times(1)).reportThreadPool(list);
-        verify(mockRegistry, times(1)).reportThreadPoolConfigParameter(e1);
-        verify(mockRegistry, times(1)).reportThreadPoolConfigParameter(e2);
+    private ExecutorSnapshot buildSnapshot(String executorName) {
+        ExecutorSnapshot snapshot = new ExecutorSnapshot();
+        snapshot.setAppName("app");
+        snapshot.setInstanceId("instance");
+        snapshot.setExecutorName(executorName);
+        return snapshot;
     }
+
 }
-

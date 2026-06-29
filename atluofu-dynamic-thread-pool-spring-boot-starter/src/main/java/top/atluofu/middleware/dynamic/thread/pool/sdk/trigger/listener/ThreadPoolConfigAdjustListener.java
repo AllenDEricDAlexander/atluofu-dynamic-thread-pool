@@ -1,14 +1,18 @@
 package top.atluofu.middleware.dynamic.thread.pool.sdk.trigger.listener;
 
-import com.alibaba.fastjson2.JSON;
 import org.redisson.api.listener.MessageListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.IDynamicThreadPoolService;
-import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ExecutorUpdateCommand;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.UpdateResult;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.IRegistry;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.model.DtpAuditEvent;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.model.DtpConfigChangeMessage;
 
-import java.util.List;
+import java.time.Instant;
+import java.util.UUID;
 
 /**
  * @BelongsProject: atluofu-dynamic-thread-pool
@@ -19,7 +23,7 @@ import java.util.List;
  * @Description: 动态线程池变更监听
  * @Version: 1.0
  */
-public class ThreadPoolConfigAdjustListener implements MessageListener<ThreadPoolConfigEntity> {
+public class ThreadPoolConfigAdjustListener implements MessageListener<DtpConfigChangeMessage> {
 
     private final Logger logger = LoggerFactory.getLogger(ThreadPoolConfigAdjustListener.class);
 
@@ -33,41 +37,42 @@ public class ThreadPoolConfigAdjustListener implements MessageListener<ThreadPoo
     }
 
     @Override
-    public void onMessage(CharSequence charSequence, ThreadPoolConfigEntity threadPoolConfigEntity) {
+    public void onMessage(CharSequence channel, DtpConfigChangeMessage message) {
         try {
-            logger.info("动态线程池，收到配置变更消息。线程池名称:{} 核心线程数:{} 最大线程数:{}", 
-                threadPoolConfigEntity.getThreadPoolName(), 
-                threadPoolConfigEntity.getCorePoolSize(), 
-                threadPoolConfigEntity.getMaximumPoolSize());
-            
-            // 1. 先更新线程池配置
-            dynamicThreadPoolService.updateThreadPoolConfig(threadPoolConfigEntity);
-            logger.info("动态线程池，配置更新完成。线程池名称:{}", threadPoolConfigEntity.getThreadPoolName());
-
-            // 2. 无论更新是否成功，都上报最新数据（保证数据不丢失）
-            List<ThreadPoolConfigEntity> threadPoolConfigEntities = dynamicThreadPoolService.queryThreadPoolList();
-            registry.reportThreadPool(threadPoolConfigEntities);
-            logger.info("动态线程池，上报线程池列表完成。数量:{}", threadPoolConfigEntities.size());
-
-            // 3. 上报单个线程池配置
-            ThreadPoolConfigEntity currentConfig = dynamicThreadPoolService.queryThreadPoolConfigByName(
-                threadPoolConfigEntity.getThreadPoolName());
-            registry.reportThreadPoolConfigParameter(currentConfig);
-            logger.info("动态线程池，上报线程池配置完成。{}", JSON.toJSONString(currentConfig));
-            
-        } catch (Exception e) {
-            logger.error("动态线程池，配置变更处理失败。线程池名称:{}", 
-                threadPoolConfigEntity.getThreadPoolName(), e);
-            
-            // 4. 即使出错也要上报当前状态，保证监控不中断
-            try {
-                List<ThreadPoolConfigEntity> entities = dynamicThreadPoolService.queryThreadPoolList();
-                registry.reportThreadPool(entities);
-                logger.warn("动态线程池，异常后上报当前状态。数量:{}", entities.size());
-            } catch (Exception ex) {
-                logger.error("动态线程池，异常后上报状态也失败", ex);
+            MDC.put("traceId", message.getTraceId());
+            MDC.put("requestId", message.getRequestId());
+            ExecutorUpdateCommand command = message.getPayload();
+            UpdateResult result = dynamicThreadPoolService.updateExecutor(command);
+            DtpAuditEvent event = buildAuditEvent(message, result);
+            registry.recordAuditEvent(event);
+            if (result.getAfter() != null) {
+                registry.reportSnapshot(result.getAfter());
             }
+        } catch (Exception e) {
+            logger.error("动态线程池，配置变更处理失败。应用:{} 实例:{} 执行器:{}",
+                    message.getAppName(), message.getInstanceId(), message.getExecutorName(), e);
+        } finally {
+            MDC.clear();
         }
+    }
+
+    private DtpAuditEvent buildAuditEvent(DtpConfigChangeMessage message, UpdateResult result) {
+        DtpAuditEvent event = new DtpAuditEvent();
+        event.setEventId(UUID.randomUUID().toString());
+        event.setTraceId(message.getTraceId());
+        event.setRequestId(message.getRequestId());
+        event.setAppName(message.getAppName());
+        event.setInstanceId(message.getInstanceId());
+        event.setExecutorName(message.getExecutorName());
+        event.setExecutorKind(message.getExecutorKind());
+        event.setOperator(message.getOperator());
+        event.setOperationType("UPDATE");
+        event.setBeforeValue(result.getBefore());
+        event.setAfterValue(result.getAfter());
+        event.setSuccess(result.isSuccess());
+        event.setErrorMessage(result.isSuccess() ? null : result.getMessage());
+        event.setCreatedAt(Instant.now());
+        return event;
     }
 
 }

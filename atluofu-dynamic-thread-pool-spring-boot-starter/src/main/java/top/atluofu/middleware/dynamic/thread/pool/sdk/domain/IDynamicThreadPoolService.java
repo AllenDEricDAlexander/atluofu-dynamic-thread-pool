@@ -1,7 +1,8 @@
 package top.atluofu.middleware.dynamic.thread.pool.sdk.domain;
 
-
-import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ExecutorSnapshot;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ExecutorUpdateCommand;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.UpdateResult;
 
 import java.util.List;
 
@@ -12,10 +13,10 @@ import java.util.List;
  **/
 public interface IDynamicThreadPoolService {
 
-    List<ThreadPoolConfigEntity> queryThreadPoolList();
+    List<ExecutorSnapshot> queryExecutorSnapshots();
 
-    ThreadPoolConfigEntity queryThreadPoolConfigByName(String threadPoolName);
+    ExecutorSnapshot queryExecutorSnapshot(String executorName);
 
-    void updateThreadPoolConfig(ThreadPoolConfigEntity threadPoolConfigEntity);
+    UpdateResult updateExecutor(ExecutorUpdateCommand command);
 
 }

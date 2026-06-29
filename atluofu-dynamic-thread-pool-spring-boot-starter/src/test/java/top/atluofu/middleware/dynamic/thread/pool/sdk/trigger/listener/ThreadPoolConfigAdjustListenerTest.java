@@ -1,17 +1,31 @@
 package top.atluofu.middleware.dynamic.thread.pool.sdk.trigger.listener;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.MDC;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.IDynamicThreadPoolService;
-import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ExecutorSnapshot;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ExecutorUpdateCommand;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.UpdateResult;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.valobj.ExecutorKind;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.IRegistry;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.model.DtpAuditEvent;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.model.DtpConfigChangeMessage;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.time.Instant;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * @ClassName: ThreadPoolConfigAdjustListenerTest
@@ -22,119 +36,140 @@ import static org.mockito.Mockito.*;
  */
 public class ThreadPoolConfigAdjustListenerTest {
 
-    private IDynamicThreadPoolService mockThreadPoolService;
-    private IRegistry mockRegistry;
+    private IDynamicThreadPoolService dynamicThreadPoolService;
+
+    private IRegistry registry;
+
     private ThreadPoolConfigAdjustListener listener;
 
     @BeforeEach
     public void setUp() {
-        mockThreadPoolService = mock(IDynamicThreadPoolService.class);
-        mockRegistry = mock(IRegistry.class);
-        listener = new ThreadPoolConfigAdjustListener(mockThreadPoolService, mockRegistry);
+        MDC.clear();
+        dynamicThreadPoolService = mock(IDynamicThreadPoolService.class);
+        registry = mock(IRegistry.class);
+        listener = new ThreadPoolConfigAdjustListener(dynamicThreadPoolService, registry);
     }
 
-    /**
-     * 测试 1：监听器收到消息后调整配置
-     */
+    @AfterEach
+    public void tearDown() {
+        MDC.clear();
+    }
+
     @Test
-    public void test_onMessage_AdjustConfig() {
-        // 准备测试数据
-        ThreadPoolConfigEntity configEntity = new ThreadPoolConfigEntity("test-app", "threadPoolExecutor01");
-        configEntity.setCorePoolSize(20);
-        configEntity.setMaximumPoolSize(50);
+    public void test_onMessage_updateAndRecordAuditEvent() {
+        DtpConfigChangeMessage message = buildMessage();
+        ExecutorSnapshot before = buildSnapshot(2, 8);
+        ExecutorSnapshot after = buildSnapshot(3, 9);
+        UpdateResult result = new UpdateResult();
+        result.setSuccess(true);
+        result.setMessage("success");
+        result.setBefore(before);
+        result.setAfter(after);
+        when(dynamicThreadPoolService.updateExecutor(message.getPayload())).thenReturn(result);
 
-        // 模拟服务返回
-        List<ThreadPoolConfigEntity> mockList = new ArrayList<>();
-        mockList.add(configEntity);
-        when(mockThreadPoolService.queryThreadPoolList()).thenReturn(mockList);
-        when(mockThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01")).thenReturn(configEntity);
+        listener.onMessage("test-channel", message);
 
-        // 执行监听
-        listener.onMessage("test-channel", configEntity);
+        verify(dynamicThreadPoolService, times(1)).updateExecutor(message.getPayload());
 
-        // 验证服务方法被调用
-        ArgumentCaptor<ThreadPoolConfigEntity> captor = ArgumentCaptor.forClass(ThreadPoolConfigEntity.class);
-        verify(mockThreadPoolService, times(1)).updateThreadPoolConfig(captor.capture());
+        ArgumentCaptor<DtpAuditEvent> eventCaptor = ArgumentCaptor.forClass(DtpAuditEvent.class);
+        verify(registry, times(1)).recordAuditEvent(eventCaptor.capture());
+        DtpAuditEvent event = eventCaptor.getValue();
+        assertEquals("trace-001", event.getTraceId());
+        assertEquals("request-001", event.getRequestId());
+        assertEquals("test-app", event.getAppName());
+        assertEquals("instance-001", event.getInstanceId());
+        assertEquals("orderExecutor", event.getExecutorName());
+        assertEquals(ExecutorKind.PLATFORM_THREAD_POOL, event.getExecutorKind());
+        assertEquals("tester", event.getOperator());
+        assertEquals("UPDATE", event.getOperationType());
+        assertSame(before, event.getBeforeValue());
+        assertSame(after, event.getAfterValue());
+        assertTrue(event.isSuccess());
+        assertNull(event.getErrorMessage());
 
-        ThreadPoolConfigEntity capturedConfig = captor.getValue();
-        assertEquals(20, capturedConfig.getCorePoolSize(), "核心线程数应该正确");
-        assertEquals(50, capturedConfig.getMaximumPoolSize(), "最大线程数应该正确");
+        verify(registry, times(1)).reportSnapshot(after);
+        assertNull(MDC.get("traceId"));
+        assertNull(MDC.get("requestId"));
     }
 
-    /**
-     * 测试 2：监听器收到消息后上报数据
-     */
     @Test
-    public void test_onMessage_ReportData() {
-        ThreadPoolConfigEntity configEntity = new ThreadPoolConfigEntity("test-app", "threadPoolExecutor01");
-        configEntity.setCorePoolSize(20);
-        configEntity.setMaximumPoolSize(50);
+    public void test_onMessage_recordFailedAuditEvent() {
+        DtpConfigChangeMessage message = buildMessage();
+        ExecutorSnapshot before = buildSnapshot(2, 8);
+        ExecutorSnapshot after = buildSnapshot(2, 8);
+        UpdateResult result = new UpdateResult();
+        result.setSuccess(false);
+        result.setMessage("corePoolSize must <= maximumPoolSize");
+        result.setBefore(before);
+        result.setAfter(after);
+        when(dynamicThreadPoolService.updateExecutor(message.getPayload())).thenReturn(result);
 
-        List<ThreadPoolConfigEntity> mockList = new ArrayList<>();
-        mockList.add(configEntity);
-        when(mockThreadPoolService.queryThreadPoolList()).thenReturn(mockList);
-        when(mockThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01")).thenReturn(configEntity);
+        listener.onMessage("test-channel", message);
 
-        listener.onMessage("test-channel", configEntity);
-
-        // 验证上报方法被调用
-        verify(mockRegistry, times(1)).reportThreadPool(mockList);
-        verify(mockRegistry, times(1)).reportThreadPoolConfigParameter(configEntity);
+        ArgumentCaptor<DtpAuditEvent> eventCaptor = ArgumentCaptor.forClass(DtpAuditEvent.class);
+        verify(registry, times(1)).recordAuditEvent(eventCaptor.capture());
+        DtpAuditEvent event = eventCaptor.getValue();
+        assertFalse(event.isSuccess());
+        assertEquals("corePoolSize must <= maximumPoolSize", event.getErrorMessage());
+        assertSame(before, event.getBeforeValue());
+        assertSame(after, event.getAfterValue());
+        verify(registry, times(1)).reportSnapshot(after);
+        assertNull(MDC.get("traceId"));
+        assertNull(MDC.get("requestId"));
     }
 
-    /**
-     * 测试 3：验证日志字段使用正确的 corePoolSize
-     */
     @Test
-    public void test_onMessage_LogFieldCorrect() {
-        ThreadPoolConfigEntity configEntity = new ThreadPoolConfigEntity("test-app", "threadPoolExecutor01");
-        configEntity.setCorePoolSize(30);  // 设置核心线程数
-        configEntity.setMaximumPoolSize(60);
-        configEntity.setPoolSize(10);  // 设置池中线程数（不应该用于日志）
+    public void test_onMessage_withoutAfterSnapshotDoesNotReportSnapshot() {
+        DtpConfigChangeMessage message = buildMessage();
+        UpdateResult result = new UpdateResult();
+        result.setSuccess(false);
+        result.setMessage("executor not found: orderExecutor");
+        when(dynamicThreadPoolService.updateExecutor(message.getPayload())).thenReturn(result);
 
-        List<ThreadPoolConfigEntity> mockList = new ArrayList<>();
-        mockList.add(configEntity);
-        when(mockThreadPoolService.queryThreadPoolList()).thenReturn(mockList);
-        when(mockThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01")).thenReturn(configEntity);
+        listener.onMessage("test-channel", message);
 
-        // 执行时不应该抛出异常，日志应该使用 corePoolSize 而不是 poolSize
-        listener.onMessage("test-channel", configEntity);
-
-        // 验证 updateThreadPoolConfig 被调用时使用的是 corePoolSize
-        ArgumentCaptor<ThreadPoolConfigEntity> captor = ArgumentCaptor.forClass(ThreadPoolConfigEntity.class);
-        verify(mockThreadPoolService).updateThreadPoolConfig(captor.capture());
-        assertEquals(30, captor.getValue().getCorePoolSize(), "应该使用 corePoolSize");
+        verify(dynamicThreadPoolService, times(1)).updateExecutor(message.getPayload());
+        verify(registry, times(1)).recordAuditEvent(org.mockito.ArgumentMatchers.any(DtpAuditEvent.class));
+        verifyNoMoreInteractions(registry);
+        assertNull(MDC.get("traceId"));
+        assertNull(MDC.get("requestId"));
     }
 
-    /**
-     * 测试 4：验证上报时使用查询到的最新数据
-     */
-    @Test
-    public void test_onMessage_ReportCurrentData() {
-        ThreadPoolConfigEntity requestConfig = new ThreadPoolConfigEntity("test-app", "threadPoolExecutor01");
-        requestConfig.setCorePoolSize(30);
-        requestConfig.setMaximumPoolSize(60);
+    private DtpConfigChangeMessage buildMessage() {
+        ExecutorUpdateCommand command = new ExecutorUpdateCommand();
+        command.setAppName("test-app");
+        command.setInstanceId("instance-001");
+        command.setExecutorName("orderExecutor");
+        command.setExecutorKind(ExecutorKind.PLATFORM_THREAD_POOL);
+        command.setCorePoolSize(3);
+        command.setMaximumPoolSize(9);
+        command.setTraceId("trace-001");
+        command.setRequestId("request-001");
+        command.setOperator("tester");
 
-        // 模拟查询返回的实际数据（可能包含更多状态信息）
-        ThreadPoolConfigEntity currentConfig = new ThreadPoolConfigEntity("test-app", "threadPoolExecutor01");
-        currentConfig.setCorePoolSize(30);
-        currentConfig.setMaximumPoolSize(60);
-        currentConfig.setActiveCount(5);
-        currentConfig.setQueueSize(10);
-
-        List<ThreadPoolConfigEntity> mockList = new ArrayList<>();
-        mockList.add(currentConfig);
-        when(mockThreadPoolService.queryThreadPoolList()).thenReturn(mockList);
-        when(mockThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01")).thenReturn(currentConfig);
-
-        listener.onMessage("test-channel", requestConfig);
-
-        // 验证上报的是查询到的最新数据，而不是请求数据
-        ArgumentCaptor<ThreadPoolConfigEntity> reportCaptor = ArgumentCaptor.forClass(ThreadPoolConfigEntity.class);
-        verify(mockRegistry).reportThreadPoolConfigParameter(reportCaptor.capture());
-
-        ThreadPoolConfigEntity reportedConfig = reportCaptor.getValue();
-        assertEquals(5, reportedConfig.getActiveCount(), "活跃线程数应该被上报");
-        assertEquals(10, reportedConfig.getQueueSize(), "队列大小应该被上报");
+        DtpConfigChangeMessage message = new DtpConfigChangeMessage();
+        message.setMessageId("message-001");
+        message.setTraceId("trace-001");
+        message.setRequestId("request-001");
+        message.setAppName("test-app");
+        message.setInstanceId("instance-001");
+        message.setExecutorName("orderExecutor");
+        message.setExecutorKind(ExecutorKind.PLATFORM_THREAD_POOL);
+        message.setPayload(command);
+        message.setOperator("tester");
+        message.setTimestamp(Instant.now());
+        return message;
     }
+
+    private ExecutorSnapshot buildSnapshot(int corePoolSize, int maximumPoolSize) {
+        ExecutorSnapshot snapshot = new ExecutorSnapshot();
+        snapshot.setAppName("test-app");
+        snapshot.setInstanceId("instance-001");
+        snapshot.setExecutorName("orderExecutor");
+        snapshot.setExecutorKind(ExecutorKind.PLATFORM_THREAD_POOL);
+        snapshot.setCorePoolSize(corePoolSize);
+        snapshot.setMaximumPoolSize(maximumPoolSize);
+        return snapshot;
+    }
+
 }
