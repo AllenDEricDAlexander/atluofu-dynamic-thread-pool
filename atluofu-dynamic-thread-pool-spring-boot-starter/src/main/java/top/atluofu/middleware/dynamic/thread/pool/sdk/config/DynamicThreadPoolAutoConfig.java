@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.redisson.Redisson;
@@ -15,11 +16,13 @@ import org.redisson.codec.JsonJacksonCodec;
 import org.redisson.config.Config;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.DynamicThreadPoolService;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.IDynamicThreadPoolService;
@@ -121,12 +124,6 @@ public class DynamicThreadPoolAutoConfig {
         return new ManagedExecutorRegistry(managedExecutors);
     }
 
-    @Bean
-    @ConditionalOnClass(name = "io.micrometer.core.instrument.MeterRegistry")
-    public DtpMeterBinder dtpMeterBinder(ManagedExecutorRegistry managedExecutorRegistry) {
-        return new DtpMeterBinder(managedExecutorRegistry);
-    }
-
     @Bean("dynamicThreadPollService")
     public DynamicThreadPoolService dynamicThreadPollService(ManagedExecutorRegistry managedExecutorRegistry) {
         return new DynamicThreadPoolService(managedExecutorRegistry);
@@ -175,6 +172,18 @@ public class DynamicThreadPoolAutoConfig {
             return appName + "-" + serverPort;
         }
         return appName + "-" + ManagementFactory.getRuntimeMXBean().getName();
+    }
+
+    @Configuration
+    @ConditionalOnClass(name = "io.micrometer.core.instrument.MeterRegistry")
+    static class DtpMetricsConfiguration {
+
+        @Bean
+        @ConditionalOnBean(MeterRegistry.class)
+        public DtpMeterBinder dtpMeterBinder(ManagedExecutorRegistry managedExecutorRegistry) {
+            return new DtpMeterBinder(managedExecutorRegistry);
+        }
+
     }
 
 }
