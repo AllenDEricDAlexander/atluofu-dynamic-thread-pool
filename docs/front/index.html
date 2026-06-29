@@ -130,7 +130,9 @@ label {
         <thead>
         <tr>
             <th>应用名称</th>
+            <th>实例 ID</th>
             <th>线程池名称</th>
+            <th>执行器类型</th>
             <th>核心线程池数</th>
             <th>最大线程数</th>
             <th>当前活跃线程数</th>
@@ -154,8 +156,12 @@ label {
         <form id="configForm">
             <label for="appName">应用名称:</label><br>
             <input type="text" id="appName" name="appName" readonly><br>
-            <label for="threadPoolName">线程池名称:</label><br>
-            <input type="text" id="threadPoolName" name="threadPoolName" readonly><br>
+            <label for="instanceId">实例 ID:</label><br>
+            <input type="text" id="instanceId" name="instanceId" readonly><br>
+            <label for="executorName">线程池名称:</label><br>
+            <input type="text" id="executorName" name="executorName" readonly><br>
+            <label for="executorKind">执行器类型:</label><br>
+            <input type="text" id="executorKind" name="executorKind" readonly><br>
             <label for="corePoolSize">核心线程池数:</label><br>
             <input type="number" id="corePoolSize" name="corePoolSize"><br>
             <label for="maximumPoolSize">最大线程数:</label><br>
@@ -196,7 +202,57 @@ label {
             function fetchThreadPoolList() {
                 loader.style.display = 'block';
                 var xhr = new XMLHttpRequest();
-                xhr.open('GET', 'http://localhost:8089/api/v1/dynamic/thread/pool/query_thread_pool_list', true);
+                xhr.open('GET', 'http://localhost:8089/api/v1/dtp/apps', true);
+                xhr.onload = function() {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        var response = JSON.parse(xhr.responseText);
+                        if (response.code === "0000" && Array.isArray(response.data) && response.data.length > 0) {
+                            fetchInstanceList(response.data[0]);
+                        } else {
+                            tbody.innerHTML = '';
+                            console.error('No dynamic thread pool apps found!');
+                            loader.style.display = 'none';
+                        }
+                    } else {
+                        console.error('The request failed!');
+                        loader.style.display = 'none';
+                    }
+                };
+                xhr.onerror = function() {
+                    console.error('The request failed!');
+                    loader.style.display = 'none';
+                };
+                xhr.send();
+            }
+
+            function fetchInstanceList(appName) {
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', 'http://localhost:8089/api/v1/dtp/apps/' + encodeURIComponent(appName) + '/instances', true);
+                xhr.onload = function() {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        var response = JSON.parse(xhr.responseText);
+                        if (response.code === "0000" && Array.isArray(response.data) && response.data.length > 0) {
+                            fetchExecutors(appName, response.data[0]);
+                        } else {
+                            tbody.innerHTML = '';
+                            console.error('No dynamic thread pool instances found!');
+                            loader.style.display = 'none';
+                        }
+                    } else {
+                        console.error('The request failed!');
+                        loader.style.display = 'none';
+                    }
+                };
+                xhr.onerror = function() {
+                    console.error('The request failed!');
+                    loader.style.display = 'none';
+                };
+                xhr.send();
+            }
+
+            function fetchExecutors(appName, instanceId) {
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', 'http://localhost:8089/api/v1/dtp/apps/' + encodeURIComponent(appName) + '/instances/' + encodeURIComponent(instanceId) + '/executors', true);
                 xhr.onload = function() {
                     if (xhr.status >= 200 && xhr.status < 300) {
                         var response = JSON.parse(xhr.responseText);
@@ -204,17 +260,19 @@ label {
                             var html = '';
                             response.data.forEach(function(item) {
                                 html += '<tr>';
-                                html += '<td>' + item.appName + '</td>';
-                                html += '<td>' + item.threadPoolName + '</td>';
-                                html += '<td>' + item.corePoolSize + '</td>';
-                                html += '<td>' + item.maximumPoolSize + '</td>';
-                                html += '<td>' + item.activeCount + '</td>';
-                                html += '<td>' + item.poolSize + '</td>';
-                                html += '<td>' + item.queueType + '</td>';
-                                html += '<td>' + item.queueSize + '</td>';
-                                html += '<td>' + item.remainingCapacity + '</td>';
-                                html += '<td><button onclick="openModal(\'' + item.appName + '\', \'' + item.threadPoolName + '\')">修改</button></td>';
-                html += '</tr>';
+                                html += '<td>' + display(item.appName) + '</td>';
+                                html += '<td>' + display(item.instanceId) + '</td>';
+                                html += '<td>' + display(item.executorName) + '</td>';
+                                html += '<td>' + display(item.executorKind) + '</td>';
+                                html += '<td>' + display(item.corePoolSize) + '</td>';
+                                html += '<td>' + display(item.maximumPoolSize) + '</td>';
+                                html += '<td>' + display(item.activeCount) + '</td>';
+                                html += '<td>' + display(item.poolSize) + '</td>';
+                                html += '<td>' + display(item.queueType) + '</td>';
+                                html += '<td>' + display(item.queueSize) + '</td>';
+                                html += '<td>' + display(item.remainingCapacity) + '</td>';
+                                html += '<td><button onclick="openModal(\'' + item.appName + '\', \'' + item.instanceId + '\', \'' + item.executorName + '\')">修改</button></td>';
+                                html += '</tr>';
                             });
                             tbody.innerHTML = html;
                         } else {
@@ -232,6 +290,11 @@ label {
                 xhr.send();
             }
 
+            function display(value) {
+                return value === null || value === undefined ? '-' : value;
+            }
+
+            window.fetchThreadPoolList = fetchThreadPoolList;
             fetchThreadPoolList();
         });
 
@@ -252,17 +315,19 @@ label {
         }
 
          // 打开模态框并填充数据
-        function openModal(appName, threadPoolName) {
+        function openModal(appName, instanceId, executorName) {
             // 发起请求获取线程池配置
             var xhr = new XMLHttpRequest();
-            xhr.open('GET', 'http://localhost:8089/api/v1/dynamic/thread/pool/query_thread_pool_config?appName=' + appName + '&threadPoolName=' + threadPoolName, true);
+            xhr.open('GET', 'http://localhost:8089/api/v1/dtp/apps/' + encodeURIComponent(appName) + '/instances/' + encodeURIComponent(instanceId) + '/executors/' + encodeURIComponent(executorName), true);
             xhr.onload = function() {
                 if (xhr.status >= 200 && xhr.status < 300) {
                     var response = JSON.parse(xhr.responseText);
                     if (response.code === "0000" && response.data) {
                         // 填充模态框表单
                         document.getElementById('appName').value = response.data.appName;
-                        document.getElementById('threadPoolName').value = response.data.threadPoolName;
+                        document.getElementById('instanceId').value = response.data.instanceId;
+                        document.getElementById('executorName').value = response.data.executorName;
+                        document.getElementById('executorKind').value = response.data.executorKind;
                         document.getElementById('corePoolSize').value = response.data.corePoolSize;
                         document.getElementById('maximumPoolSize').value = response.data.maximumPoolSize;
                         // ... (填充其他只读字段) ...
@@ -283,12 +348,14 @@ label {
         // 更新配置
         function updateConfig() {
             var appName = document.getElementById('appName').value;
-            var threadPoolName = document.getElementById('threadPoolName').value;
+            var instanceId = document.getElementById('instanceId').value;
+            var executorName = document.getElementById('executorName').value;
+            var executorKind = document.getElementById('executorKind').value;
             var corePoolSize = document.getElementById('corePoolSize').value;
             var maximumPoolSize = document.getElementById('maximumPoolSize').value;
 
             var xhr = new XMLHttpRequest();
-            xhr.open('POST', 'http://localhost:8089/api/v1/dynamic/thread/pool/update_thread_pool_config', true);
+            xhr.open('POST', 'http://localhost:8089/api/v1/dtp/apps/' + encodeURIComponent(appName) + '/instances/' + encodeURIComponent(instanceId) + '/executors/' + encodeURIComponent(executorName) + '/resize', true);
             xhr.setRequestHeader('Content-Type', 'application/json');
             xhr.onload = function() {
                 if (xhr.status >= 200 && xhr.status < 300) {
@@ -296,7 +363,7 @@ label {
                     if (response.code === "0000") {
                         alert('Configuration updated successfully!');
                         modal.style.display = "none";
-                        fetchThreadPoolList(); // 重新加载线程池列表
+                        window.fetchThreadPoolList(); // 重新加载线程池列表
                     } else {
                         alert('Failed to update configuration: ' + response.info);
                     }
@@ -308,10 +375,10 @@ label {
                 alert('Failed to update configuration!');
             };
             xhr.send(JSON.stringify({
-                appName: appName,
-                threadPoolName: threadPoolName,
+                executorKind: executorKind,
                 corePoolSize: parseInt(corePoolSize, 10),
-                maximumPoolSize: parseInt(maximumPoolSize, 10)
+                maximumPoolSize: parseInt(maximumPoolSize, 10),
+                operator: 'admin'
             }));
         }
 
