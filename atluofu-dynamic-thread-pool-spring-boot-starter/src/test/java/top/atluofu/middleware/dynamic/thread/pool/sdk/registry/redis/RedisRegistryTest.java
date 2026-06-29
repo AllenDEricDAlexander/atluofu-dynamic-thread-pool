@@ -3,15 +3,17 @@ package top.atluofu.middleware.dynamic.thread.pool.sdk.registry.redis;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RBucket;
 import org.redisson.api.RList;
+import org.redisson.api.RSet;
+import org.redisson.api.RTopic;
 import org.redisson.api.RedissonClient;
-import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
-import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.valobj.RegistryEnumVO;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ExecutorSnapshot;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.model.DtpAuditEvent;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.model.DtpConfigChangeMessage;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.model.DtpRedisKeys;
 
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
+import java.time.Instant;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -21,54 +23,78 @@ import static org.mockito.Mockito.*;
 public class RedisRegistryTest {
 
     /**
-     * 测试：上报线程池列表
+     * 测试：上报执行器快照
      */
     @Test
-    public void test_reportThreadPool() {
+    public void test_reportSnapshot() {
         RedissonClient mockRedissonClient = mock(RedissonClient.class);
         @SuppressWarnings("rawtypes")
-        RList mockRList = mock(RList.class);
+        RSet mockApps = mock(RSet.class);
+        @SuppressWarnings("rawtypes")
+        RSet mockInstances = mock(RSet.class);
+        @SuppressWarnings("rawtypes")
+        RBucket mockSnapshotBucket = mock(RBucket.class);
         RedisRegistry redisRegistry = new RedisRegistry(mockRedissonClient);
 
-        ThreadPoolConfigEntity e1 = new ThreadPoolConfigEntity("app", "pool1");
-        ThreadPoolConfigEntity e2 = new ThreadPoolConfigEntity("app", "pool2");
-        List<ThreadPoolConfigEntity> list = Arrays.asList(e1, e2);
+        ExecutorSnapshot snapshot = new ExecutorSnapshot();
+        snapshot.setAppName("test-app");
+        snapshot.setInstanceId("i-001");
+        snapshot.setExecutorName("executor01");
 
-        when(mockRedissonClient.getList(RegistryEnumVO.THREAD_POOL_CONFIG_LIST_KEY.getKey()))
-                .thenReturn(mockRList);
+        when(mockRedissonClient.getSet(DtpRedisKeys.apps())).thenReturn(mockApps);
+        when(mockRedissonClient.getSet(DtpRedisKeys.instances("test-app"))).thenReturn(mockInstances);
+        when(mockRedissonClient.getBucket(DtpRedisKeys.snapshot("test-app", "i-001", "executor01"))).thenReturn(mockSnapshotBucket);
 
-        redisRegistry.reportThreadPool(list);
+        redisRegistry.reportSnapshot(snapshot);
 
-        verify(mockRedissonClient, times(1))
-                .getList(RegistryEnumVO.THREAD_POOL_CONFIG_LIST_KEY.getKey());
-        verify(mockRList, times(1)).delete();
-        verify(mockRList, times(1)).addAll(list);
+        verify(mockRedissonClient, times(1)).getSet(DtpRedisKeys.apps());
+        verify(mockApps, times(1)).add("test-app");
+        verify(mockRedissonClient, times(1)).getSet(DtpRedisKeys.instances("test-app"));
+        verify(mockInstances, times(1)).add("i-001");
+        verify(mockRedissonClient, times(1)).getBucket(DtpRedisKeys.snapshot("test-app", "i-001", "executor01"));
+        verify(mockSnapshotBucket, times(1)).set(eq(snapshot), eq(Duration.ofSeconds(90)));
     }
 
     /**
-     * 测试：上报单个线程池配置
+     * 测试：发布配置变更消息
      */
     @Test
-    public void test_reportThreadPoolConfigParameter() {
+    public void test_publishConfigChange() {
         RedissonClient mockRedissonClient = mock(RedissonClient.class);
-        @SuppressWarnings("rawtypes")
-        RBucket mockRBucket = mock(RBucket.class);
+        RTopic mockTopic = mock(RTopic.class);
         RedisRegistry redisRegistry = new RedisRegistry(mockRedissonClient);
 
-        ThreadPoolConfigEntity entity = new ThreadPoolConfigEntity("test-app", "threadPoolExecutor01");
-        entity.setCorePoolSize(10);
-        entity.setMaximumPoolSize(50);
+        DtpConfigChangeMessage message = new DtpConfigChangeMessage();
+        message.setAppName("test-app");
 
-        String expectedKey = RegistryEnumVO.THREAD_POOL_CONFIG_PARAMETER_LIST_KEY.getKey()
-                + "_" + entity.getAppName()
-                + "_" + entity.getThreadPoolName();
+        when(mockRedissonClient.getTopic(DtpRedisKeys.changeTopic("test-app"))).thenReturn(mockTopic);
 
-        when(mockRedissonClient.getBucket(expectedKey)).thenReturn(mockRBucket);
+        redisRegistry.publishConfigChange(message);
 
-        redisRegistry.reportThreadPoolConfigParameter(entity);
+        verify(mockRedissonClient, times(1)).getTopic(DtpRedisKeys.changeTopic("test-app"));
+        verify(mockTopic, times(1)).publish(message);
+    }
 
-        verify(mockRedissonClient, times(1)).getBucket(expectedKey);
-        verify(mockRBucket, times(1)).set(eq(entity), any(Duration.class));
+    /**
+     * 测试：记录审计事件
+     */
+    @Test
+    public void test_recordAuditEvent() {
+        RedissonClient mockRedissonClient = mock(RedissonClient.class);
+        @SuppressWarnings("rawtypes")
+        RList mockList = mock(RList.class);
+        RedisRegistry redisRegistry = new RedisRegistry(mockRedissonClient);
+
+        DtpAuditEvent event = new DtpAuditEvent();
+        event.setAppName("test-app");
+        event.setCreatedAt(Instant.parse("2026-06-29T10:15:30Z"));
+
+        when(mockRedissonClient.getList(DtpRedisKeys.event("test-app", "20260629"))).thenReturn(mockList);
+
+        redisRegistry.recordAuditEvent(event);
+
+        verify(mockRedissonClient, times(1)).getList(DtpRedisKeys.event("test-app", "20260629"));
+        verify(mockList, times(1)).add(event);
+        verify(mockList, times(1)).expire(Duration.ofDays(30));
     }
 }
-
