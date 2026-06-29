@@ -3,6 +3,7 @@ package top.atluofu.middleware.dynamic.thread.pool.trigger.model;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.valobj.ExecutorKind;
 
 /**
  * @author      有罗敷的马同学
@@ -13,6 +14,8 @@ import lombok.ToString;
 @Setter
 @ToString
 public class ResizeExecutorRequest {
+
+    private ExecutorKind executorKind;
 
     private Integer corePoolSize;
 

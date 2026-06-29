@@ -2,6 +2,7 @@ package top.atluofu.middleware.dynamic.thread.pool.integration;
 
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RTopic;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -13,6 +14,7 @@ import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.valobj.Execut
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static top.atluofu.middleware.dynamic.thread.pool.support.DtpSampleTestSupport.THREAD_POOL_EXECUTOR_01;
@@ -31,6 +33,7 @@ import static top.atluofu.middleware.dynamic.thread.pool.support.DtpSampleTestSu
  */
 @Slf4j
 @SpringBootTest
+@EnabledIfEnvironmentVariable(named = "DTP_REDIS_TESTS", matches = "true")
 public class ThreadPoolIntegrationTest {
 
     @Resource
@@ -178,6 +181,7 @@ public class ThreadPoolIntegrationTest {
 
         ExecutorSnapshot originalConfig = requireSnapshot(dynamicThreadPoolService, THREAD_POOL_EXECUTOR_01);
         CountDownLatch latch = new CountDownLatch(3);
+        AtomicReference<Throwable> childFailure = new AtomicReference<>();
 
         try {
             for (int i = 0; i < 3; i++) {
@@ -190,13 +194,16 @@ public class ThreadPoolIntegrationTest {
                         dynamicThreadPoolRedisTopic.publish(changeMessage(command));
                         log.info("发布配置 #{}: 核心={}, 最大={}",
                                 index, command.getCorePoolSize(), command.getMaximumPoolSize());
+                    } catch (Throwable e) {
+                        childFailure.compareAndSet(null, e);
                     } finally {
                         latch.countDown();
                     }
                 }).start();
             }
 
-            latch.await(10, TimeUnit.SECONDS);
+            assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(childFailure.get()).isNull();
             Thread.sleep(2000);
 
             ExecutorSnapshot finalConfig = requireSnapshot(dynamicThreadPoolService, THREAD_POOL_EXECUTOR_01);

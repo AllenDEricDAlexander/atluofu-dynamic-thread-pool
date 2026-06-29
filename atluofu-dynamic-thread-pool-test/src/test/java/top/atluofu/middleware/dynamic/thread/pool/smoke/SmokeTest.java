@@ -2,6 +2,7 @@ package top.atluofu.middleware.dynamic.thread.pool.smoke;
 
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RTopic;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -30,6 +31,7 @@ import static top.atluofu.middleware.dynamic.thread.pool.support.DtpSampleTestSu
  */
 @Slf4j
 @SpringBootTest
+@EnabledIfEnvironmentVariable(named = "DTP_REDIS_TESTS", matches = "true")
 public class SmokeTest {
 
     @Resource

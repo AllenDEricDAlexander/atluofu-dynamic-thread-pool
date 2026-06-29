@@ -141,6 +141,7 @@ public class DynamicThreadPoolControllerTest {
         MDC.put("traceId", "trace-001");
         MDC.put("requestId", "request-001");
         ResizeExecutorRequest request = new ResizeExecutorRequest();
+        request.setExecutorKind(ExecutorKind.PLATFORM_THREAD_POOL);
         request.setCorePoolSize(4);
         request.setMaximumPoolSize(16);
         request.setKeepAliveSeconds(30L);
@@ -181,8 +182,30 @@ public class DynamicThreadPoolControllerTest {
     }
 
     @Test
+    public void shouldPublishSpringTaskExecutorResizeMessage() {
+        ResizeExecutorRequest request = new ResizeExecutorRequest();
+        request.setExecutorKind(ExecutorKind.SPRING_THREAD_POOL_TASK_EXECUTOR);
+        request.setCorePoolSize(4);
+        request.setMaximumPoolSize(16);
+        request.setOperator("admin");
+        when(mockRedissonClient.getTopic(DtpRedisKeys.changeTopic("order-app"))).thenReturn(mockRTopic);
+
+        Response<Boolean> response = controller.resizeExecutor("order-app", "order-8093", "taskExecutor", request);
+
+        assertEquals(Response.Code.SUCCESS.getCode(), response.getCode());
+        assertTrue(response.getData());
+        ArgumentCaptor<DtpConfigChangeMessage> captor = ArgumentCaptor.forClass(DtpConfigChangeMessage.class);
+        verify(mockRTopic).publish(captor.capture());
+        DtpConfigChangeMessage message = captor.getValue();
+        assertEquals(ExecutorKind.SPRING_THREAD_POOL_TASK_EXECUTOR, message.getExecutorKind());
+        assertEquals(ExecutorKind.SPRING_THREAD_POOL_TASK_EXECUTOR, message.getPayload().getExecutorKind());
+        assertEquals("taskExecutor", message.getExecutorName());
+    }
+
+    @Test
     public void shouldNotPublishInvalidResizeMessage() {
         ResizeExecutorRequest request = new ResizeExecutorRequest();
+        request.setExecutorKind(ExecutorKind.PLATFORM_THREAD_POOL);
         request.setCorePoolSize(16);
         request.setMaximumPoolSize(4);
 
@@ -197,6 +220,7 @@ public class DynamicThreadPoolControllerTest {
     @Test
     public void shouldNotPublishResizeWhenCoreTimeoutHasInvalidKeepAlive() {
         ResizeExecutorRequest request = new ResizeExecutorRequest();
+        request.setExecutorKind(ExecutorKind.PLATFORM_THREAD_POOL);
         request.setCorePoolSize(4);
         request.setMaximumPoolSize(16);
         request.setAllowCoreThreadTimeOut(true);
@@ -206,6 +230,50 @@ public class DynamicThreadPoolControllerTest {
         assertEquals(Response.Code.ILLEGAL_PARAMETER.getCode(), response.getCode());
         assertFalse(response.getData());
         assertTrue(response.getInfo().contains("keepAliveSeconds"));
+        verify(mockRedissonClient, never()).getTopic(anyString());
+    }
+
+    @Test
+    public void shouldNotPublishResizeWhenExecutorKindMissing() {
+        ResizeExecutorRequest request = new ResizeExecutorRequest();
+        request.setCorePoolSize(4);
+        request.setMaximumPoolSize(16);
+
+        Response<Boolean> response = controller.resizeExecutor("order-app", "order-8093", "orderExecutor", request);
+
+        assertEquals(Response.Code.ILLEGAL_PARAMETER.getCode(), response.getCode());
+        assertFalse(response.getData());
+        assertTrue(response.getInfo().contains("executorKind"));
+        verify(mockRedissonClient, never()).getTopic(anyString());
+    }
+
+    @Test
+    public void shouldNotPublishResizeWhenExecutorKindIsVirtual() {
+        ResizeExecutorRequest request = new ResizeExecutorRequest();
+        request.setExecutorKind(ExecutorKind.VIRTUAL_THREAD_PER_TASK);
+        request.setCorePoolSize(4);
+        request.setMaximumPoolSize(16);
+
+        Response<Boolean> response = controller.resizeExecutor("order-app", "order-8093", "orderExecutor", request);
+
+        assertEquals(Response.Code.ILLEGAL_PARAMETER.getCode(), response.getCode());
+        assertFalse(response.getData());
+        assertTrue(response.getInfo().contains("executorKind"));
+        verify(mockRedissonClient, never()).getTopic(anyString());
+    }
+
+    @Test
+    public void shouldNotPublishResizeWhenExecutorKindUnsupported() {
+        ResizeExecutorRequest request = new ResizeExecutorRequest();
+        request.setExecutorKind(ExecutorKind.UNKNOWN);
+        request.setCorePoolSize(4);
+        request.setMaximumPoolSize(16);
+
+        Response<Boolean> response = controller.resizeExecutor("order-app", "order-8093", "orderExecutor", request);
+
+        assertEquals(Response.Code.ILLEGAL_PARAMETER.getCode(), response.getCode());
+        assertFalse(response.getData());
+        assertTrue(response.getInfo().contains("executorKind"));
         verify(mockRedissonClient, never()).getTopic(anyString());
     }
 

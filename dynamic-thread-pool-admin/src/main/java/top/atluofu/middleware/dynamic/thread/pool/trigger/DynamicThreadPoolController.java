@@ -113,10 +113,11 @@ public class DynamicThreadPoolController {
             return Response.<Boolean>error(error).setDataValue(false);
         }
         try {
+            ExecutorKind executorKind = request.getExecutorKind();
             DtpConfigChangeMessage message = buildConfigChangeMessage(appName, instanceId, executorName,
-                    ExecutorKind.PLATFORM_THREAD_POOL, request.getOperator());
+                    executorKind, request.getOperator());
             ExecutorUpdateCommand command = buildBaseCommand(appName, instanceId, executorName,
-                    ExecutorKind.PLATFORM_THREAD_POOL, request.getOperator());
+                    executorKind, request.getOperator());
             command.setCorePoolSize(request.getCorePoolSize());
             command.setMaximumPoolSize(request.getMaximumPoolSize());
             command.setKeepAliveSeconds(request.getKeepAliveSeconds());
@@ -169,6 +170,9 @@ public class DynamicThreadPoolController {
         if (request == null) {
             return "resize request must not be null";
         }
+        if (!isResizableExecutorKind(request.getExecutorKind())) {
+            return "executorKind must be PLATFORM_THREAD_POOL or SPRING_THREAD_POOL_TASK_EXECUTOR";
+        }
         if (request.getCorePoolSize() == null || request.getCorePoolSize() <= 0) {
             return "corePoolSize must be positive";
         }
@@ -183,6 +187,11 @@ public class DynamicThreadPoolController {
             return "keepAliveSeconds must be positive when allowCoreThreadTimeOut is true";
         }
         return null;
+    }
+
+    private boolean isResizableExecutorKind(ExecutorKind executorKind) {
+        return executorKind == ExecutorKind.PLATFORM_THREAD_POOL
+                || executorKind == ExecutorKind.SPRING_THREAD_POOL_TASK_EXECUTOR;
     }
 
     private String validateVirtualLimitRequest(VirtualLimitRequest request) {

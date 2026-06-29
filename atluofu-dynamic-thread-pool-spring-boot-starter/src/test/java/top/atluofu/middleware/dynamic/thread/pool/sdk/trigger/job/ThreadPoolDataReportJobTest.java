@@ -1,12 +1,15 @@
 package top.atluofu.middleware.dynamic.thread.pool.sdk.trigger.job;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.scheduling.annotation.Scheduled;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.IDynamicThreadPoolService;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ExecutorSnapshot;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.IRegistry;
 
+import java.lang.reflect.Method;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -45,6 +48,15 @@ public class ThreadPoolDataReportJobTest {
 
         verify(dynamicThreadPoolService, times(1)).queryExecutorSnapshots();
         verifyNoInteractions(registry);
+    }
+
+    @Test
+    public void test_execReportThreadPoolList_shouldUseReportIntervalProperty() throws NoSuchMethodException {
+        Method method = ThreadPoolDataReportJob.class.getMethod("execReportThreadPoolList");
+        Scheduled scheduled = method.getAnnotation(Scheduled.class);
+
+        assertThat(scheduled).isNotNull();
+        assertThat(scheduled.fixedDelayString()).isEqualTo("${atluofu.dynamic.thread-pool.report.interval:20s}");
     }
 
     private ExecutorSnapshot buildSnapshot(String executorName) {

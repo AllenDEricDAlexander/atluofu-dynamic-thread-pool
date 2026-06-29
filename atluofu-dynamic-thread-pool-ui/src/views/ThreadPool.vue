@@ -360,6 +360,7 @@ const handleUpdate = async () => {
       })
     } else {
       const resizePayload = {
+        executorKind: editForm.value.executorKind,
         corePoolSize: editForm.value.corePoolSize,
         maximumPoolSize: editForm.value.maximumPoolSize,
         operator: 'admin'

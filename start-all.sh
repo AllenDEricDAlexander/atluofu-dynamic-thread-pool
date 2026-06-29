@@ -59,7 +59,7 @@ else
 fi
 
 # 检查 Admin 后端
-if curl -s http://localhost:8089/api/v1/dynamic/thread/pool/query_thread_pool_list > /dev/null; then
+if curl -s http://localhost:8089/api/v1/dtp/apps > /dev/null; then
     echo "✅ Admin 后端 (8089): 运行正常"
 else
     echo "❌ Admin 后端 (8089): 未运行"
@@ -77,13 +77,14 @@ echo ""
 echo "======================================"
 echo "  当前线程池数据"
 echo "======================================"
-curl -s http://localhost:8089/api/v1/dynamic/thread/pool/query_thread_pool_list 2>&1 | python3 -c "
+curl -s http://localhost:8089/api/v1/dtp/apps 2>&1 | python3 -c "
 import sys,json
 try:
     d=json.load(sys.stdin)
-    print(f'线程池数量：{len(d.get(\"data\", []))}')
-    for item in d.get('data', []):
-        print(f'  - {item[\"threadPoolName\"]}: 核心={item[\"corePoolSize\"]}, 最大={item[\"maximumPoolSize\"]}')
+    apps=d.get('data', [])
+    print(f'应用数量：{len(apps)}')
+    for app in apps:
+        print(f'  - {app}')
 except Exception as e:
     print(f'数据获取失败：{e}')
 " 2>/dev/null

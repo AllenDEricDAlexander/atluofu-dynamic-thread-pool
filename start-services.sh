@@ -66,7 +66,7 @@ sleep 15
 # 检查服务状态
 echo ""
 echo "检查服务状态..."
-if curl -s http://localhost:8089/api/v1/dynamic/thread/pool/query_thread_pool_list > /dev/null 2>&1; then
+if curl -s http://localhost:8089/api/v1/dtp/apps > /dev/null 2>&1; then
     echo "✓ Admin 后端服务正常"
 else
     echo "⚠ Admin 后端服务可能还未完全启动"

@@ -75,9 +75,14 @@ npm run preview
 
 | 接口 | 方法 | 描述 |
 |------|------|------|
-| /api/v1/dynamic/thread/pool/query_thread_pool_list | GET | 查询线程池列表 |
-| /api/v1/dynamic/thread/pool/query_thread_pool_config | GET | 查询线程池配置 |
-| /api/v1/dynamic/thread/pool/update_thread_pool_config | POST | 更新线程池配置 |
+| /api/v1/dtp/apps | GET | 查询应用列表 |
+| /api/v1/dtp/apps/{appName}/instances | GET | 查询实例列表 |
+| /api/v1/dtp/apps/{appName}/instances/{instanceId}/executors | GET | 查询执行器列表 |
+| /api/v1/dtp/apps/{appName}/instances/{instanceId}/executors/{executorName} | GET | 查询执行器快照 |
+| /api/v1/dtp/apps/{appName}/instances/{instanceId}/executors/{executorName}/resize | POST | 调整平台或 Spring 线程池容量 |
+| /api/v1/dtp/apps/{appName}/instances/{instanceId}/executors/{executorName}/virtual-limit | POST | 调整虚拟线程执行器并发限制 |
+
+旧版 `/api/v1/dynamic/thread/pool/*` 下划线接口已移除。
 
 ## 代理配置
 

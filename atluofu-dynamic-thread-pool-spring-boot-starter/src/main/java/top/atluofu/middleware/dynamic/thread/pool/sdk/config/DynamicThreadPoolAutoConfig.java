@@ -146,12 +146,6 @@ public class DynamicThreadPoolAutoConfig {
         return topic;
     }
 
-    @Bean
-    public ThreadPoolDataReportJob threadPoolDataReportJob(IDynamicThreadPoolService dynamicThreadPoolService,
-                                                           IRegistry registry) {
-        return new ThreadPoolDataReportJob(dynamicThreadPoolService, registry);
-    }
-
     String resolveAppName(ApplicationContext applicationContext, DynamicThreadPoolAutoProperties properties) {
         if (StringUtils.isNotBlank(properties.getAppName())) {
             return properties.getAppName();
@@ -172,6 +166,18 @@ public class DynamicThreadPoolAutoConfig {
             return appName + "-" + serverPort;
         }
         return appName + "-" + ManagementFactory.getRuntimeMXBean().getName();
+    }
+
+    @Configuration
+    static class DtpReportConfiguration {
+
+        @Bean
+        @ConditionalOnProperty(prefix = "atluofu.dynamic.thread-pool.report", name = "enabled", havingValue = "true", matchIfMissing = true)
+        public ThreadPoolDataReportJob threadPoolDataReportJob(IDynamicThreadPoolService dynamicThreadPoolService,
+                                                               IRegistry registry) {
+            return new ThreadPoolDataReportJob(dynamicThreadPoolService, registry);
+        }
+
     }
 
     @Configuration

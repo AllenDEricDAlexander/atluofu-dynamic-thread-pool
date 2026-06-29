@@ -29,7 +29,7 @@ public class ThreadPoolDataReportJob {
         this.registry = registry;
     }
 
-    @Scheduled(cron = "0/20 * * * * ?")
+    @Scheduled(fixedDelayString = "${atluofu.dynamic.thread-pool.report.interval:20s}")
     public void execReportThreadPoolList() {
         try {
             List<ExecutorSnapshot> snapshots = dynamicThreadPoolService.queryExecutorSnapshots();
