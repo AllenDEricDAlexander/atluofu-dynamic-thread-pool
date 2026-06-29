@@ -78,6 +78,12 @@ public class BoundedVirtualThreadManagedExecutor implements ManagedExecutor {
         UpdateResult result = new UpdateResult();
         result.setBefore(before);
         try {
+            if (command.getConcurrencyLimit() == null) {
+                result.setSuccess(false);
+                result.setMessage("concurrencyLimit must not be null");
+                result.setAfter(snapshot());
+                return result;
+            }
             executor.updateConcurrencyLimit(command.getConcurrencyLimit());
             result.setSuccess(true);
             result.setMessage("success");

@@ -9,7 +9,11 @@ import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.Update
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.valobj.ExecutorKind;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.executor.adapter.BoundedVirtualThreadManagedExecutor;
 
+import java.util.Collections;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -58,6 +62,25 @@ public class BoundedVirtualThreadExecutorTest {
     }
 
     @Test
+    public void test_submitCallableShouldRunTaskWithCapturedMdcAndIncrementCompletedOnce() throws Exception {
+        BoundedVirtualThreadExecutor executor = new BoundedVirtualThreadExecutor("dtp-virtual", 1);
+        try {
+            MDC.put("traceId", "trace-virtual-submit-001");
+
+            Future<String> future = executor.submit(() -> MDC.get("traceId"));
+
+            assertThat(future.get()).isEqualTo("trace-virtual-submit-001");
+            assertThat(executor.submittedTasks()).isEqualTo(1L);
+            assertThat(executor.completedTasks()).isEqualTo(1L);
+            assertThat(executor.failedTasks()).isEqualTo(0L);
+            assertThat(executor.runningTasks()).isEqualTo(0L);
+            assertThat(executor.availablePermits()).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     public void test_executeShouldRejectWhenConcurrencyLimitExceeded() throws Exception {
         BoundedVirtualThreadExecutor executor = new BoundedVirtualThreadExecutor("dtp-virtual", 1);
         CountDownLatch started = new CountDownLatch(1);
@@ -80,6 +103,92 @@ public class BoundedVirtualThreadExecutorTest {
             assertThat(executor.availablePermits()).isEqualTo(0);
         } finally {
             release.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void test_submitCallableFailureShouldIncrementFailedOnly() {
+        BoundedVirtualThreadExecutor executor = new BoundedVirtualThreadExecutor("dtp-virtual", 1);
+        try {
+            Future<String> future = executor.submit(() -> {
+                throw new IllegalStateException("submit failure");
+            });
+
+            assertThatThrownBy(future::get)
+                    .isInstanceOf(ExecutionException.class)
+                    .hasCauseInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("submit failure");
+            assertThat(executor.submittedTasks()).isEqualTo(1L);
+            assertThat(executor.completedTasks()).isEqualTo(0L);
+            assertThat(executor.failedTasks()).isEqualTo(1L);
+            assertThat(executor.runningTasks()).isEqualTo(0L);
+            assertThat(executor.availablePermits()).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void test_submitRunnableFailureShouldIncrementFailedOnly() {
+        BoundedVirtualThreadExecutor executor = new BoundedVirtualThreadExecutor("dtp-virtual", 1);
+        try {
+            Future<?> future = executor.submit(() -> {
+                throw new IllegalStateException("submit runnable failure");
+            });
+
+            assertThatThrownBy(future::get)
+                    .isInstanceOf(ExecutionException.class)
+                    .hasCauseInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("submit runnable failure");
+            assertThat(executor.submittedTasks()).isEqualTo(1L);
+            assertThat(executor.completedTasks()).isEqualTo(0L);
+            assertThat(executor.failedTasks()).isEqualTo(1L);
+            assertThat(executor.runningTasks()).isEqualTo(0L);
+            assertThat(executor.availablePermits()).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void test_invokeAllFailureShouldIncrementFailedOnly() throws Exception {
+        BoundedVirtualThreadExecutor executor = new BoundedVirtualThreadExecutor("dtp-virtual", 1);
+        try {
+            Future<String> future = executor.invokeAll(Collections.<Callable<String>>singletonList(() -> {
+                throw new IllegalStateException("invoke failure");
+            })).getFirst();
+
+            assertThatThrownBy(future::get)
+                    .isInstanceOf(ExecutionException.class)
+                    .hasCauseInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("invoke failure");
+            assertThat(executor.submittedTasks()).isEqualTo(1L);
+            assertThat(executor.completedTasks()).isEqualTo(0L);
+            assertThat(executor.failedTasks()).isEqualTo(1L);
+            assertThat(executor.runningTasks()).isEqualTo(0L);
+            assertThat(executor.availablePermits()).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void test_invokeAnyFailureShouldIncrementFailedOnly() {
+        BoundedVirtualThreadExecutor executor = new BoundedVirtualThreadExecutor("dtp-virtual", 1);
+        try {
+            assertThatThrownBy(() -> executor.invokeAny(Collections.<Callable<String>>singletonList(() -> {
+                throw new IllegalStateException("invoke any failure");
+            })))
+                    .isInstanceOf(ExecutionException.class)
+                    .hasCauseInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("invoke any failure");
+            assertThat(executor.submittedTasks()).isEqualTo(1L);
+            assertThat(executor.completedTasks()).isEqualTo(0L);
+            assertThat(executor.failedTasks()).isEqualTo(1L);
+            assertThat(executor.runningTasks()).isEqualTo(0L);
+            assertThat(executor.availablePermits()).isEqualTo(1);
+        } finally {
             executor.shutdownNow();
         }
     }
@@ -161,6 +270,13 @@ public class BoundedVirtualThreadExecutorTest {
             assertThat(result.getBefore().getConcurrencyLimit()).isEqualTo(2);
             assertThat(result.getAfter().getConcurrencyLimit()).isEqualTo(4);
             assertThat(executor.concurrencyLimit()).isEqualTo(4);
+
+            ExecutorUpdateCommand invalidCommand = new ExecutorUpdateCommand();
+            UpdateResult failedResult = managedExecutor.update(invalidCommand);
+
+            assertThat(failedResult.isSuccess()).isFalse();
+            assertThat(failedResult.getMessage()).isEqualTo("concurrencyLimit must not be null");
+            assertThat(failedResult.getAfter().getConcurrencyLimit()).isEqualTo(4);
         } finally {
             executor.shutdownNow();
         }

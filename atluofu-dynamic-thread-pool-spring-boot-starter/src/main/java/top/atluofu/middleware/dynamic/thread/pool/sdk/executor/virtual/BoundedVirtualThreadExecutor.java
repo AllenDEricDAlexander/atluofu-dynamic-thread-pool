@@ -1,15 +1,28 @@
 package top.atluofu.middleware.dynamic.thread.pool.sdk.executor.virtual;
 
+import top.atluofu.middleware.dynamic.thread.pool.sdk.context.DtpCallable;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.context.DtpRunnable;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -53,22 +66,140 @@ public class BoundedVirtualThreadExecutor extends AbstractExecutorService {
     @Override
     public void execute(Runnable command) {
         Objects.requireNonNull(command, "command");
+        if (command instanceof MetricsAwareTask) {
+            schedule(command, false);
+            return;
+        }
+        schedule(DtpRunnable.wrap(command), true);
+    }
+
+    @Override
+    public Future<?> submit(Runnable task) {
+        RunnableFuture<Void> future = newTaskFor(task, null);
+        schedule(future, false);
+        return future;
+    }
+
+    @Override
+    public <T> Future<T> submit(Runnable task, T result) {
+        RunnableFuture<T> future = newTaskFor(task, result);
+        schedule(future, false);
+        return future;
+    }
+
+    @Override
+    public <T> Future<T> submit(Callable<T> task) {
+        RunnableFuture<T> future = newTaskFor(task);
+        schedule(future, false);
+        return future;
+    }
+
+    @Override
+    protected <T> RunnableFuture<T> newTaskFor(Runnable runnable, T value) {
+        return new MetricsFutureTask<>(Objects.requireNonNull(runnable, "runnable"), value);
+    }
+
+    @Override
+    protected <T> RunnableFuture<T> newTaskFor(Callable<T> callable) {
+        return new MetricsFutureTask<>(Objects.requireNonNull(callable, "callable"));
+    }
+
+    @Override
+    public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
+            throws InterruptedException, ExecutionException {
+        try {
+            return doInvokeAny(tasks, false, 0L);
+        } catch (TimeoutException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    @Override
+    public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
+            throws InterruptedException, ExecutionException, TimeoutException {
+        Objects.requireNonNull(unit, "unit");
+        return doInvokeAny(tasks, true, unit.toNanos(timeout));
+    }
+
+    private <T> T doInvokeAny(Collection<? extends Callable<T>> tasks, boolean timed, long nanos)
+            throws InterruptedException, ExecutionException, TimeoutException {
+        Objects.requireNonNull(tasks, "tasks");
+        int taskCount = tasks.size();
+        if (taskCount == 0) {
+            throw new IllegalArgumentException();
+        }
+        List<Future<T>> futures = new ArrayList<>(taskCount);
+        BlockingQueue<Future<T>> completionQueue = new LinkedBlockingQueue<>();
+        Iterator<? extends Callable<T>> iterator = tasks.iterator();
+        ExecutionException executionException = null;
+        long deadline = timed ? System.nanoTime() + nanos : 0L;
+        try {
+            futures.add(submitForCompletion(iterator.next(), completionQueue));
+            taskCount--;
+            int activeTasks = 1;
+            for (; ; ) {
+                Future<T> future = completionQueue.poll();
+                if (future == null) {
+                    if (taskCount > 0) {
+                        taskCount--;
+                        futures.add(submitForCompletion(iterator.next(), completionQueue));
+                        activeTasks++;
+                    } else if (activeTasks == 0) {
+                        break;
+                    } else if (timed) {
+                        future = completionQueue.poll(nanos, TimeUnit.NANOSECONDS);
+                        if (future == null) {
+                            throw new TimeoutException();
+                        }
+                        nanos = deadline - System.nanoTime();
+                    } else {
+                        future = completionQueue.take();
+                    }
+                }
+                if (future != null) {
+                    activeTasks--;
+                    try {
+                        return future.get();
+                    } catch (ExecutionException e) {
+                        executionException = e;
+                    } catch (CancellationException e) {
+                        executionException = new ExecutionException(e);
+                    }
+                }
+            }
+            if (executionException == null) {
+                executionException = new ExecutionException(null);
+            }
+            throw executionException;
+        } finally {
+            for (Future<T> future : futures) {
+                future.cancel(true);
+            }
+        }
+    }
+
+    private <T> Future<T> submitForCompletion(Callable<T> task, BlockingQueue<Future<T>> completionQueue) {
+        QueueingMetricsFutureTask<T> future = new QueueingMetricsFutureTask<>(task, completionQueue);
+        schedule(future, false);
+        return future;
+    }
+
+    private void schedule(Runnable command, boolean countOutcome) {
         submittedTasks.incrementAndGet();
         if (!semaphore.tryAcquire()) {
             rejectedTasks.incrementAndGet();
             throw new RejectedExecutionException("Virtual executor concurrency limit exceeded");
         }
-        Runnable wrapped = DtpRunnable.wrap(command);
         boolean accepted = false;
         try {
             delegate.execute(() -> {
                 runningTasks.incrementAndGet();
                 try {
-                    wrapped.run();
-                    completedTasks.incrementAndGet();
-                } catch (Throwable e) {
-                    failedTasks.incrementAndGet();
-                    throw e;
+                    if (countOutcome) {
+                        runAndCount(command);
+                    } else {
+                        command.run();
+                    }
                 } finally {
                     runningTasks.decrementAndGet();
                     semaphore.release();
@@ -83,6 +214,30 @@ public class BoundedVirtualThreadExecutor extends AbstractExecutorService {
                 semaphore.release();
             }
         }
+    }
+
+    private void runAndCount(Runnable command) {
+        try {
+            command.run();
+            completedTasks.incrementAndGet();
+        } catch (Throwable e) {
+            failedTasks.incrementAndGet();
+            throw e;
+        }
+    }
+
+    private <T> Callable<T> callAndCount(Callable<T> callable) {
+        Callable<T> wrapped = DtpCallable.wrap(callable);
+        return () -> {
+            try {
+                T result = wrapped.call();
+                completedTasks.incrementAndGet();
+                return result;
+            } catch (Throwable e) {
+                failedTasks.incrementAndGet();
+                throw e;
+            }
+        };
     }
 
     public int concurrencyLimit() {
@@ -153,6 +308,40 @@ public class BoundedVirtualThreadExecutor extends AbstractExecutorService {
     @Override
     public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
         return delegate.awaitTermination(timeout, unit);
+    }
+
+    private interface MetricsAwareTask {
+    }
+
+    private class MetricsFutureTask<T> extends FutureTask<T> implements MetricsAwareTask {
+
+        private MetricsFutureTask(Runnable runnable, T result) {
+            super(callAndCount(() -> {
+                runnable.run();
+                return result;
+            }));
+        }
+
+        private MetricsFutureTask(Callable<T> callable) {
+            super(callAndCount(callable));
+        }
+
+    }
+
+    private final class QueueingMetricsFutureTask<T> extends MetricsFutureTask<T> {
+
+        private final BlockingQueue<Future<T>> completionQueue;
+
+        private QueueingMetricsFutureTask(Callable<T> callable, BlockingQueue<Future<T>> completionQueue) {
+            super(callable);
+            this.completionQueue = completionQueue;
+        }
+
+        @Override
+        protected void done() {
+            completionQueue.add(this);
+        }
+
     }
 
     private static final class AdjustableSemaphore extends Semaphore {
