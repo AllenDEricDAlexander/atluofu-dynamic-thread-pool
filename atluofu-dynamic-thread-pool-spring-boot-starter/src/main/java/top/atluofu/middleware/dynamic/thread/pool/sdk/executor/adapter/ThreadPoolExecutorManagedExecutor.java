@@ -83,6 +83,13 @@ public class ThreadPoolExecutorManagedExecutor implements ManagedExecutor {
         UpdateResult result = new UpdateResult();
         result.setBefore(before);
         try {
+            String validationMessage = validate(command);
+            if (validationMessage != null) {
+                result.setSuccess(false);
+                result.setMessage(validationMessage);
+                result.setAfter(snapshot());
+                return result;
+            }
             if (command.getCorePoolSize() != null && command.getMaximumPoolSize() != null) {
                 ThreadPoolResizeSupport.resize(executor, command.getCorePoolSize(), command.getMaximumPoolSize());
             }
@@ -100,6 +107,34 @@ public class ThreadPoolExecutorManagedExecutor implements ManagedExecutor {
         }
         result.setAfter(snapshot());
         return result;
+    }
+
+    private String validate(ExecutorUpdateCommand command) {
+        boolean hasCorePoolSize = command.getCorePoolSize() != null;
+        boolean hasMaximumPoolSize = command.getMaximumPoolSize() != null;
+        if (hasCorePoolSize != hasMaximumPoolSize) {
+            return "corePoolSize and maximumPoolSize must be provided together";
+        }
+        if (hasCorePoolSize) {
+            if (command.getCorePoolSize() <= 0 || command.getMaximumPoolSize() <= 0) {
+                return "corePoolSize and maximumPoolSize must be positive";
+            }
+            if (command.getCorePoolSize() > command.getMaximumPoolSize()) {
+                return "corePoolSize must <= maximumPoolSize";
+            }
+        }
+        if (command.getKeepAliveSeconds() != null && command.getKeepAliveSeconds() < 0) {
+            return "keepAliveSeconds must be >= 0";
+        }
+        if (Boolean.TRUE.equals(command.getAllowCoreThreadTimeOut())) {
+            long keepAliveSeconds = command.getKeepAliveSeconds() != null
+                    ? command.getKeepAliveSeconds()
+                    : executor.getKeepAliveTime(TimeUnit.SECONDS);
+            if (keepAliveSeconds <= 0) {
+                return "keepAliveSeconds must be > 0 when allowCoreThreadTimeOut is true";
+            }
+        }
+        return null;
     }
 
     @Override

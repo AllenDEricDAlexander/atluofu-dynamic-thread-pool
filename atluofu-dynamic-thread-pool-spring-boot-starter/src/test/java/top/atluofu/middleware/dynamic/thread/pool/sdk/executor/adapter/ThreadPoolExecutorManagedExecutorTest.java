@@ -90,4 +90,77 @@ public class ThreadPoolExecutorManagedExecutorTest {
         assertTrue(executor.allowsCoreThreadTimeOut());
     }
 
+    @Test
+    public void test_updateRejectsIncompleteResizeCommand() {
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                5, 10,
+                60L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(100)
+        );
+        ThreadPoolExecutorManagedExecutor managedExecutor = new ThreadPoolExecutorManagedExecutor(
+                "test-app", "instance-01", "testExecutor", executor
+        );
+        ExecutorUpdateCommand command = new ExecutorUpdateCommand();
+        command.setCorePoolSize(12);
+
+        UpdateResult result = managedExecutor.update(command);
+
+        assertFalse(result.isSuccess());
+        assertEquals("corePoolSize and maximumPoolSize must be provided together", result.getMessage());
+        assertEquals(5, executor.getCorePoolSize());
+        assertEquals(10, executor.getMaximumPoolSize());
+        assertEquals(5, result.getAfter().getCorePoolSize());
+        assertEquals(10, result.getAfter().getMaximumPoolSize());
+    }
+
+    @Test
+    public void test_updateRejectsNegativeKeepAliveBeforeResize() {
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                5, 10,
+                60L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(100)
+        );
+        ThreadPoolExecutorManagedExecutor managedExecutor = new ThreadPoolExecutorManagedExecutor(
+                "test-app", "instance-01", "testExecutor", executor
+        );
+        ExecutorUpdateCommand command = new ExecutorUpdateCommand();
+        command.setCorePoolSize(12);
+        command.setMaximumPoolSize(15);
+        command.setKeepAliveSeconds(-1L);
+
+        UpdateResult result = managedExecutor.update(command);
+
+        assertFalse(result.isSuccess());
+        assertEquals("keepAliveSeconds must be >= 0", result.getMessage());
+        assertEquals(5, executor.getCorePoolSize());
+        assertEquals(10, executor.getMaximumPoolSize());
+        assertEquals(60L, executor.getKeepAliveTime(TimeUnit.SECONDS));
+    }
+
+    @Test
+    public void test_updateRejectsCoreThreadTimeoutWithoutKeepAliveBeforeResize() {
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                5, 10,
+                60L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(100)
+        );
+        ThreadPoolExecutorManagedExecutor managedExecutor = new ThreadPoolExecutorManagedExecutor(
+                "test-app", "instance-01", "testExecutor", executor
+        );
+        ExecutorUpdateCommand command = new ExecutorUpdateCommand();
+        command.setCorePoolSize(12);
+        command.setMaximumPoolSize(15);
+        command.setKeepAliveSeconds(0L);
+        command.setAllowCoreThreadTimeOut(true);
+
+        UpdateResult result = managedExecutor.update(command);
+
+        assertFalse(result.isSuccess());
+        assertEquals("keepAliveSeconds must be > 0 when allowCoreThreadTimeOut is true", result.getMessage());
+        assertEquals(5, executor.getCorePoolSize());
+        assertEquals(10, executor.getMaximumPoolSize());
+        assertEquals(60L, executor.getKeepAliveTime(TimeUnit.SECONDS));
+        assertFalse(executor.allowsCoreThreadTimeOut());
+    }
+
 }
