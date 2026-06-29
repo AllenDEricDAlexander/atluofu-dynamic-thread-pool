@@ -195,6 +195,21 @@ public class DynamicThreadPoolControllerTest {
     }
 
     @Test
+    public void shouldNotPublishResizeWhenCoreTimeoutHasInvalidKeepAlive() {
+        ResizeExecutorRequest request = new ResizeExecutorRequest();
+        request.setCorePoolSize(4);
+        request.setMaximumPoolSize(16);
+        request.setAllowCoreThreadTimeOut(true);
+
+        Response<Boolean> response = controller.resizeExecutor("order-app", "order-8093", "orderExecutor", request);
+
+        assertEquals(Response.Code.ILLEGAL_PARAMETER.getCode(), response.getCode());
+        assertFalse(response.getData());
+        assertTrue(response.getInfo().contains("keepAliveSeconds"));
+        verify(mockRedissonClient, never()).getTopic(anyString());
+    }
+
+    @Test
     public void shouldPublishVirtualLimitMessage() {
         MDC.put("traceId", "trace-002");
         MDC.put("requestId", "request-002");

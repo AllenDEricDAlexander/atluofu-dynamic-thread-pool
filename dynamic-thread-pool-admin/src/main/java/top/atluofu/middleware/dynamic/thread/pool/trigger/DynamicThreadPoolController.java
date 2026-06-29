@@ -178,6 +178,10 @@ public class DynamicThreadPoolController {
         if (request.getCorePoolSize() > request.getMaximumPoolSize()) {
             return "corePoolSize must be less than or equal to maximumPoolSize";
         }
+        if (Boolean.TRUE.equals(request.getAllowCoreThreadTimeOut())
+                && (request.getKeepAliveSeconds() == null || request.getKeepAliveSeconds() <= 0)) {
+            return "keepAliveSeconds must be positive when allowCoreThreadTimeOut is true";
+        }
         return null;
     }
 

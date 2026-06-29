@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.Data;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
@@ -18,8 +19,9 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.config.DynamicThreadPoolAutoConfig;
 
-@SpringBootApplication
+@SpringBootApplication(exclude = DynamicThreadPoolAutoConfig.class)
 @Configurable
 public class Application {
 
@@ -35,17 +37,8 @@ public class Application {
         public RedissonClient redissonClient(ConfigurableApplicationContext applicationContext, RedisClientConfigProperties properties) {
             Config config = new Config();
             
-            // 创建 ObjectMapper 并配置类型信息
-            ObjectMapper objectMapper = new ObjectMapper();
-            objectMapper.activateDefaultTyping(
-                LaissezFaireSubTypeValidator.instance,
-                ObjectMapper.DefaultTyping.NON_FINAL,
-                JsonTypeInfo.As.PROPERTY
-            );
-            objectMapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
-            
             // 使用自定义 ObjectMapper 的 JsonJacksonCodec
-            config.setCodec(new JsonJacksonCodec(objectMapper));
+            config.setCodec(new JsonJacksonCodec(createRedisObjectMapper()));
 
             config.useSingleServer()
                     .setAddress("redis://" + properties.getHost() + ":" + properties.getPort())
@@ -62,6 +55,19 @@ public class Application {
             ;
 
             return Redisson.create(config);
+        }
+
+        static ObjectMapper createRedisObjectMapper() {
+            // 创建 ObjectMapper 并配置类型信息
+            ObjectMapper objectMapper = new ObjectMapper();
+            objectMapper.registerModule(new JavaTimeModule());
+            objectMapper.activateDefaultTyping(
+                LaissezFaireSubTypeValidator.instance,
+                ObjectMapper.DefaultTyping.NON_FINAL,
+                JsonTypeInfo.As.PROPERTY
+            );
+            objectMapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
+            return objectMapper;
         }
 
     }

@@ -1,9 +1,14 @@
 package top.atluofu.middleware.dynamic.thread.pool;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.config.DynamicThreadPoolAutoConfig;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.model.DtpConfigChangeMessage;
+
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -51,6 +56,24 @@ class ApplicationRedisClientConfigPropertiesTest {
             assertThat(properties.getPingInterval()).isEqualTo(60000);
             assertThat(properties.isKeepAlive()).isTrue();
         });
+    }
+
+    @Test
+    void shouldSerializeDtpMessageInstantWithAdminRedisObjectMapper() throws Exception {
+        ObjectMapper objectMapper = Application.RedisClientConfig.createRedisObjectMapper();
+        DtpConfigChangeMessage message = new DtpConfigChangeMessage();
+        message.setAppName("order-app");
+        message.setTimestamp(Instant.parse("2026-06-30T00:00:00Z"));
+
+        String json = objectMapper.writeValueAsString(message);
+
+        assertThat(json).contains("timestamp");
+    }
+
+    @Test
+    void shouldExcludeStarterAutoConfigurationFromAdminApplication() {
+        assertThat(Application.class.getAnnotation(org.springframework.boot.autoconfigure.SpringBootApplication.class).exclude())
+                .contains(DynamicThreadPoolAutoConfig.class);
     }
 
     @Configuration
