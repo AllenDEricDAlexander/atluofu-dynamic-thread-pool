@@ -1,5 +1,6 @@
 package top.atluofu.middleware.dynamic.thread.pool.sdk.context;
 
+import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
@@ -19,6 +20,7 @@ public final class DtpSupplier<T> implements Supplier<T> {
     }
 
     public static <T> Supplier<T> wrap(Supplier<T> supplier) {
+        Objects.requireNonNull(supplier, "supplier");
         if (supplier instanceof DtpSupplier<?>) {
             return supplier;
         }

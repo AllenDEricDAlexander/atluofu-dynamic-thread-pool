@@ -1,5 +1,6 @@
 package top.atluofu.middleware.dynamic.thread.pool.sdk.context;
 
+import java.util.Objects;
 import java.util.concurrent.Callable;
 
 /**
@@ -19,6 +20,7 @@ public final class DtpCallable<V> implements Callable<V> {
     }
 
     public static <V> Callable<V> wrap(Callable<V> callable) {
+        Objects.requireNonNull(callable, "callable");
         if (callable instanceof DtpCallable<?>) {
             return callable;
         }

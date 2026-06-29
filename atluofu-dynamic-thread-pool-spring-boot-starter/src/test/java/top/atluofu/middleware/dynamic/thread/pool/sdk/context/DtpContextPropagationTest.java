@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 
+import java.util.Collections;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -11,6 +12,7 @@ import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 /**
  * @ClassName: DtpContextPropagationTest
@@ -88,6 +90,59 @@ public class DtpContextPropagationTest {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    @Test
+    public void test_runnableWrapShouldRejectNullRunnable() {
+        assertThatNullPointerException().isThrownBy(() -> DtpRunnable.wrap(null));
+    }
+
+    @Test
+    public void test_callableWrapShouldRejectNullCallable() {
+        assertThatNullPointerException().isThrownBy(() -> DtpCallable.wrap(null));
+    }
+
+    @Test
+    public void test_supplierWrapShouldRejectNullSupplier() {
+        assertThatNullPointerException().isThrownBy(() -> DtpSupplier.wrap(null));
+    }
+
+    @Test
+    public void test_executorServiceShouldRejectNullDelegate() {
+        assertThatNullPointerException().isThrownBy(() -> new DtpContextAwareExecutorService(null));
+    }
+
+    @Test
+    public void test_executorServiceSubmitCallableShouldRejectNullSynchronously() {
+        ExecutorService delegate = Executors.newSingleThreadExecutor();
+        ExecutorService executor = new DtpContextAwareExecutorService(delegate);
+        try {
+            assertThatNullPointerException().isThrownBy(() -> executor.submit((Callable<?>) null));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void test_executorServiceInvokeAllShouldRejectNullCallableElementSynchronously() {
+        ExecutorService delegate = Executors.newSingleThreadExecutor();
+        ExecutorService executor = new DtpContextAwareExecutorService(delegate);
+        try {
+            assertThatNullPointerException().isThrownBy(() -> executor.invokeAll(Collections.singletonList(null)));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void test_threadsShouldRejectNullTaskAndName() {
+        assertThatNullPointerException().isThrownBy(() -> DtpThreads.startVirtualThread(null));
+        assertThatNullPointerException().isThrownBy(() -> DtpThreads.newPlatformThread(null, () -> {
+        }));
+        assertThatNullPointerException().isThrownBy(() -> DtpThreads.newPlatformThread("dtp-test", null));
+        assertThatNullPointerException().isThrownBy(() -> DtpThreads.newVirtualThread(null, () -> {
+        }));
+        assertThatNullPointerException().isThrownBy(() -> DtpThreads.newVirtualThread("dtp-test", null));
     }
 
 }

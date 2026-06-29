@@ -3,6 +3,7 @@ package top.atluofu.middleware.dynamic.thread.pool.sdk.context;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -21,7 +22,7 @@ public class DtpContextAwareExecutorService extends AbstractExecutorService {
     private final ExecutorService delegate;
 
     public DtpContextAwareExecutorService(ExecutorService delegate) {
-        this.delegate = delegate;
+        this.delegate = Objects.requireNonNull(delegate, "delegate");
     }
 
     @Override
@@ -92,9 +93,10 @@ public class DtpContextAwareExecutorService extends AbstractExecutorService {
     }
 
     private <T> Collection<Callable<T>> wrapCallables(Collection<? extends Callable<T>> tasks) {
+        Objects.requireNonNull(tasks, "tasks");
         List<Callable<T>> wrapped = new ArrayList<>(tasks.size());
         for (Callable<T> task : tasks) {
-            wrapped.add(DtpCallable.wrap(task));
+            wrapped.add(DtpCallable.wrap(Objects.requireNonNull(task, "task")));
         }
         return wrapped;
     }
