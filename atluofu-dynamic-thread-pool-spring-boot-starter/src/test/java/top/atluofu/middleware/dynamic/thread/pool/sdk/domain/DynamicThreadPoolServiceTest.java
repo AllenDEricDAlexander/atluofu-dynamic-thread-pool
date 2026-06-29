@@ -86,7 +86,10 @@ public class DynamicThreadPoolServiceTest {
                 new ManagedExecutorRegistry(List.of(managedExecutor))
         );
         ExecutorUpdateCommand command = new ExecutorUpdateCommand();
+        command.setAppName("app");
+        command.setInstanceId("instance");
         command.setExecutorName("orderExecutor");
+        command.setExecutorKind(ExecutorKind.PLATFORM_THREAD_POOL);
         command.setCorePoolSize(3);
         command.setMaximumPoolSize(9);
 
@@ -124,6 +127,110 @@ public class DynamicThreadPoolServiceTest {
 
         assertFalse(result.isSuccess());
         assertEquals("executor not found: missingExecutor", result.getMessage());
+    }
+
+    @Test
+    public void test_updateExecutorRejectsMissingOrBlankAppName() {
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                2, 8,
+                30L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(100)
+        );
+        ManagedExecutor managedExecutor = new ThreadPoolExecutorManagedExecutor(
+                "app", "instance", "orderExecutor", executor
+        );
+        DynamicThreadPoolService service = new DynamicThreadPoolService(
+                new ManagedExecutorRegistry(List.of(managedExecutor))
+        );
+        ExecutorUpdateCommand missingAppCommand = new ExecutorUpdateCommand();
+        missingAppCommand.setInstanceId("instance");
+        missingAppCommand.setExecutorName("orderExecutor");
+        missingAppCommand.setExecutorKind(ExecutorKind.PLATFORM_THREAD_POOL);
+        missingAppCommand.setCorePoolSize(3);
+        missingAppCommand.setMaximumPoolSize(9);
+        ExecutorUpdateCommand blankAppCommand = new ExecutorUpdateCommand();
+        blankAppCommand.setAppName(" ");
+        blankAppCommand.setInstanceId("instance");
+        blankAppCommand.setExecutorName("orderExecutor");
+        blankAppCommand.setExecutorKind(ExecutorKind.PLATFORM_THREAD_POOL);
+        blankAppCommand.setCorePoolSize(3);
+        blankAppCommand.setMaximumPoolSize(9);
+
+        UpdateResult missingAppResult = service.updateExecutor(missingAppCommand);
+        UpdateResult blankAppResult = service.updateExecutor(blankAppCommand);
+
+        assertFalse(missingAppResult.isSuccess());
+        assertEquals("appName must not be blank", missingAppResult.getMessage());
+        assertFalse(blankAppResult.isSuccess());
+        assertEquals("appName must not be blank", blankAppResult.getMessage());
+        assertEquals(2, executor.getCorePoolSize());
+        assertEquals(8, executor.getMaximumPoolSize());
+    }
+
+    @Test
+    public void test_updateExecutorRejectsMissingOrBlankInstanceId() {
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                2, 8,
+                30L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(100)
+        );
+        ManagedExecutor managedExecutor = new ThreadPoolExecutorManagedExecutor(
+                "app", "instance", "orderExecutor", executor
+        );
+        DynamicThreadPoolService service = new DynamicThreadPoolService(
+                new ManagedExecutorRegistry(List.of(managedExecutor))
+        );
+        ExecutorUpdateCommand missingInstanceCommand = new ExecutorUpdateCommand();
+        missingInstanceCommand.setAppName("app");
+        missingInstanceCommand.setExecutorName("orderExecutor");
+        missingInstanceCommand.setExecutorKind(ExecutorKind.PLATFORM_THREAD_POOL);
+        missingInstanceCommand.setCorePoolSize(3);
+        missingInstanceCommand.setMaximumPoolSize(9);
+        ExecutorUpdateCommand blankInstanceCommand = new ExecutorUpdateCommand();
+        blankInstanceCommand.setAppName("app");
+        blankInstanceCommand.setInstanceId(" ");
+        blankInstanceCommand.setExecutorName("orderExecutor");
+        blankInstanceCommand.setExecutorKind(ExecutorKind.PLATFORM_THREAD_POOL);
+        blankInstanceCommand.setCorePoolSize(3);
+        blankInstanceCommand.setMaximumPoolSize(9);
+
+        UpdateResult missingInstanceResult = service.updateExecutor(missingInstanceCommand);
+        UpdateResult blankInstanceResult = service.updateExecutor(blankInstanceCommand);
+
+        assertFalse(missingInstanceResult.isSuccess());
+        assertEquals("instanceId must not be blank", missingInstanceResult.getMessage());
+        assertFalse(blankInstanceResult.isSuccess());
+        assertEquals("instanceId must not be blank", blankInstanceResult.getMessage());
+        assertEquals(2, executor.getCorePoolSize());
+        assertEquals(8, executor.getMaximumPoolSize());
+    }
+
+    @Test
+    public void test_updateExecutorRejectsNullExecutorKind() {
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                2, 8,
+                30L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(100)
+        );
+        ManagedExecutor managedExecutor = new ThreadPoolExecutorManagedExecutor(
+                "app", "instance", "orderExecutor", executor
+        );
+        DynamicThreadPoolService service = new DynamicThreadPoolService(
+                new ManagedExecutorRegistry(List.of(managedExecutor))
+        );
+        ExecutorUpdateCommand command = new ExecutorUpdateCommand();
+        command.setAppName("app");
+        command.setInstanceId("instance");
+        command.setExecutorName("orderExecutor");
+        command.setCorePoolSize(3);
+        command.setMaximumPoolSize(9);
+
+        UpdateResult result = service.updateExecutor(command);
+
+        assertFalse(result.isSuccess());
+        assertEquals("executorKind must not be null", result.getMessage());
+        assertEquals(2, executor.getCorePoolSize());
+        assertEquals(8, executor.getMaximumPoolSize());
     }
 
     @Test

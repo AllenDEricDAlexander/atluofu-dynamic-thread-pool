@@ -55,13 +55,22 @@ public class DynamicThreadPoolService implements IDynamicThreadPoolService {
     }
 
     private UpdateResult validateIdentity(ManagedExecutor managedExecutor, ExecutorUpdateCommand command) {
-        if (StringUtils.isNotBlank(command.getAppName()) && !command.getAppName().equals(managedExecutor.appName())) {
+        if (StringUtils.isBlank(command.getAppName())) {
+            return failure("appName must not be blank");
+        }
+        if (StringUtils.isBlank(command.getInstanceId())) {
+            return failure("instanceId must not be blank");
+        }
+        if (command.getExecutorKind() == null) {
+            return failure("executorKind must not be null");
+        }
+        if (!command.getAppName().equals(managedExecutor.appName())) {
             return failure("appName mismatch: " + command.getAppName());
         }
-        if (StringUtils.isNotBlank(command.getInstanceId()) && !command.getInstanceId().equals(managedExecutor.instanceId())) {
+        if (!command.getInstanceId().equals(managedExecutor.instanceId())) {
             return failure("instanceId mismatch: " + command.getInstanceId());
         }
-        if (command.getExecutorKind() != null && !command.getExecutorKind().equals(managedExecutor.kind())) {
+        if (!command.getExecutorKind().equals(managedExecutor.kind())) {
             return failure("executorKind mismatch: " + command.getExecutorKind());
         }
         return null;
