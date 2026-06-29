@@ -15,6 +15,7 @@ import org.redisson.codec.JsonJacksonCodec;
 import org.redisson.config.Config;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
@@ -28,6 +29,7 @@ import top.atluofu.middleware.dynamic.thread.pool.sdk.executor.adapter.BoundedVi
 import top.atluofu.middleware.dynamic.thread.pool.sdk.executor.adapter.ThreadPoolExecutorManagedExecutor;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.executor.adapter.ThreadPoolTaskExecutorManagedExecutor;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.executor.virtual.BoundedVirtualThreadExecutor;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.metrics.DtpMeterBinder;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.IRegistry;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.model.DtpConfigChangeMessage;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.model.DtpRedisKeys;
@@ -117,6 +119,12 @@ public class DynamicThreadPoolAutoConfig {
                 managedExecutors.add(new BoundedVirtualThreadManagedExecutor(appName, instanceId, executorName, executor))
         );
         return new ManagedExecutorRegistry(managedExecutors);
+    }
+
+    @Bean
+    @ConditionalOnClass(name = "io.micrometer.core.instrument.MeterRegistry")
+    public DtpMeterBinder dtpMeterBinder(ManagedExecutorRegistry managedExecutorRegistry) {
+        return new DtpMeterBinder(managedExecutorRegistry);
     }
 
     @Bean("dynamicThreadPollService")
