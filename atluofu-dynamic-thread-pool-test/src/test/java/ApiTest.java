@@ -3,7 +3,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RTopic;
 import org.springframework.boot.test.context.SpringBootTest;
-import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.IDynamicThreadPoolService;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ExecutorSnapshot;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ExecutorUpdateCommand;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static top.atluofu.middleware.dynamic.thread.pool.support.DtpSampleTestSupport.THREAD_POOL_EXECUTOR_01;
+import static top.atluofu.middleware.dynamic.thread.pool.support.DtpSampleTestSupport.changeMessage;
+import static top.atluofu.middleware.dynamic.thread.pool.support.DtpSampleTestSupport.requireSnapshot;
+import static top.atluofu.middleware.dynamic.thread.pool.support.DtpSampleTestSupport.resizeCommand;
 
 /**
  * @ClassName: ApiTest
@@ -19,17 +27,30 @@ public class ApiTest {
     @Resource
     private RTopic dynamicThreadPoolRedisTopic;
 
+    @Resource
+    private IDynamicThreadPoolService dynamicThreadPoolService;
+
     @Test
     public void test_dynamicThreadPoolRedisTopic() throws InterruptedException {
-        ThreadPoolConfigEntity threadPoolConfigEntity = new ThreadPoolConfigEntity("dynamic-thread-pool-test-app", "threadPoolExecutor01");
-        threadPoolConfigEntity.setCorePoolSize(10);
-        threadPoolConfigEntity.setMaximumPoolSize(100);
-        dynamicThreadPoolRedisTopic.publish(threadPoolConfigEntity);
-        log.info("测试：发布线程池配置更新 - 核心线程数：{}, 最大线程数：{}", 
-                threadPoolConfigEntity.getCorePoolSize(), threadPoolConfigEntity.getMaximumPoolSize());
-        // 给监听器一点时间处理消息，避免长时间阻塞
-        Thread.sleep(1000);
-    }
+        ExecutorSnapshot beforeConfig = requireSnapshot(dynamicThreadPoolService, THREAD_POOL_EXECUTOR_01);
 
+        try {
+            ExecutorUpdateCommand command = resizeCommand(beforeConfig, 10, 100);
+            dynamicThreadPoolRedisTopic.publish(changeMessage(command));
+            log.info("测试：发布执行器配置更新 - 核心线程数：{}, 最大线程数：{}",
+                    command.getCorePoolSize(), command.getMaximumPoolSize());
+
+            Thread.sleep(1000);
+
+            ExecutorSnapshot afterConfig = requireSnapshot(dynamicThreadPoolService, THREAD_POOL_EXECUTOR_01);
+            assertThat(afterConfig.getCorePoolSize()).isEqualTo(10);
+            assertThat(afterConfig.getMaximumPoolSize()).isEqualTo(100);
+        } finally {
+            ExecutorUpdateCommand restoreCommand = resizeCommand(beforeConfig,
+                    beforeConfig.getCorePoolSize(), beforeConfig.getMaximumPoolSize());
+            dynamicThreadPoolRedisTopic.publish(changeMessage(restoreCommand));
+            Thread.sleep(1000);
+        }
+    }
 
 }

@@ -1,457 +1,229 @@
 # 动态线程池管理平台
 
-## 📖 项目介绍
+## 项目介绍
 
-动态线程池管理平台是一个基于 Redis + Spring Boot + Vue 的线程池动态配置和监控系统。通过该平台，可以实时查看线程池运行状态，并动态调整线程池配置（核心线程数、最大线程数），无需重启应用即可生效。
+动态线程池管理平台基于 Spring Boot、Redis 和 Vue，提供线程池与虚拟线程执行器的注册、监控、动态调整和审计能力。业务应用接入 SDK 后，平台可以按应用、实例和执行器维度查看运行快照，并通过 Redis Topic 下发变更。
 
-### 核心特性
+核心能力：
 
-- ✅ **动态调整**：实时调整线程池核心参数，无需重启应用
-- ✅ **实时监控**：实时查看线程池运行状态（活跃线程数、队列大小等）
-- ✅ **Redis 持久化**：线程池配置持久化到 Redis，应用重启后自动恢复
-- ✅ **可视化管理**：基于 Vue 的前端管理界面，操作简便
-- ✅ **多应用支持**：支持多个应用实例的线程池统一管理
+- 管理 `ThreadPoolExecutor`、`ThreadPoolTaskExecutor` 和 `BoundedVirtualThreadExecutor`。
+- 定时上报执行器快照，包括线程池容量、队列、任务数和虚拟线程并发指标。
+- Admin 后台通过 `/api/v1/dtp` 接口查询快照、发布调整命令和查看审计事件。
+- 前端基于 Vue 3 展示应用、实例、执行器和审计数据。
 
----
+## 项目结构
 
-## 🏗️ 系统架构
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     前端管理界面 (Vue 3)                         │
-│                    http://localhost:3000                        │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   Admin 管理后台 (Spring Boot)                    │
-│                    http://localhost:8089                        │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  DynamicThreadPoolController                             │   │
-│  │  - query_thread_pool_list    查询线程池列表              │   │
-│  │  - query_thread_pool_config  查询线程池配置              │   │
-│  │  - update_thread_pool_config 更新线程池配置              │   │
-│  └─────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                          Redis                                   │
-│  - THREAD_POOL_CONFIG_LIST_KEY: 线程池配置列表                  │
-│  - THREAD_POOL_CONFIG_PARAMETER_LIST_KEY_*: 单个线程池配置      │
-│  - DYNAMIC_THREAD_POOL_REDIS_TOPIC_*: 配置变更主题              │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-              ┌───────────────┴───────────────┐
-              │                               │
-              ▼                               ▼
-┌─────────────────────────┐     ┌─────────────────────────────────┐
-│   应用 A (SDK 客户端)     │     │   应用 B (SDK 客户端)            │
-│  - DynamicThreadPoolService │  │  - 监听 Redis Topic              │
-│  - 定时上报 (20s)          │  │  - 动态调整 ThreadPoolExecutor   │
-│  - 监听配置变更            │  │  - 上报状态到 Redis              │
-└─────────────────────────┘     └─────────────────────────────────┘
-```
-
----
-
-## 📁 项目结构
-
-```
+```text
 atluofu-dynamic-thread-pool/
-├── atluofu-dynamic-thread-pool-spring-boot-starter/  # SDK 核心模块
-│   ├── src/main/java/
-│   │   └── top/atluofu/middleware/dynamic/thread/pool/sdk/
-│   │       ├── config/                    # 自动配置类
-│   │       │   ├── DynamicThreadPoolAutoConfig.java
-│   │       │   └── DynamicThreadPoolAutoProperties.java
-│   │       ├── domain/                    # 领域服务
-│   │       │   ├── DynamicThreadPoolService.java
-│   │       │   └── model/entity/          # 实体类
-│   │       ├── trigger/                   # 触发器
-│   │       │   ├── job/                   # 定时任务
-│   │       │   │   └── ThreadPoolDataReportJob.java
-│   │       │   └── listener/              # 监听器
-│   │       │       └── ThreadPoolConfigAdjustListener.java
-│   │       └── registry/                  # 注册中心
-│   │           └── redis/
-│   │               └── RedisRegistry.java
-│   └── src/test/java/                     # 单元测试
-│
-├── atluofu-dynamic-thread-pool-test/      # 测试应用（示例）
-│   ├── src/main/java/
-│   │   └── top/atluofu/
-│   │       ├── Application.java           # 启动类
-│   │       └── config/
-│   │           ├── ThreadPoolConfig.java  # 线程池配置
-│   │           └── ThreadPoolConfigProperties.java
-│   └── src/test/java/                     # 集成测试/冒烟测试
-│
-├── dynamic-thread-pool-admin/             # 管理后台
-│   ├── src/main/java/
-│   │   └── top/atluofu/middleware/dynamic/thread/pool/
-│   │       ├── Application.java
-│   │       └── trigger/
-│   │           └── DynamicThreadPoolController.java  # REST API
-│   └── src/test/java/                     # 单元测试
-│
-├── atluofu-dynamic-thread-pool-ui/        # 前端管理界面 (Vue 3)
-│   ├── src/
-│   │   ├── api/               # API 接口
-│   │   ├── views/             # 页面组件
-│   │   ├── router/            # 路由配置
-│   │   └── utils/             # 工具类
-│   ├── package.json
-│   └── vite.config.js
-│
-└── docs/                      # 文档和素材
+├── atluofu-dynamic-thread-pool-spring-boot-starter/  # SDK 自动配置、执行器适配、Redis 注册中心
+├── atluofu-dynamic-thread-pool-test/                 # 示例应用 1
+├── atluofu-dynamic-thread-pool-test2/                # 示例应用 2
+├── dynamic-thread-pool-admin/                        # Admin REST API
+├── atluofu-dynamic-thread-pool-ui/                   # Vue 管理界面
+└── docs/                                             # 升级需求和说明文档
 ```
 
----
+## 前置条件
 
-## 🔧 核心实现原理
+- JDK 21
+- Maven 3.9+
+- Redis
+- Node.js
 
-### 1. SDK 自动配置 (DynamicThreadPoolAutoConfig)
+## SDK 配置
 
-SDK 模块通过 Spring Boot 自动装配机制，自动注册以下组件：
+业务应用通过 `atluofu.dynamic.thread-pool` 前缀配置 SDK。示例：
+
+```yaml
+atluofu:
+  dynamic:
+    thread-pool:
+      enabled: true
+      app-name: ${spring.application.name}
+      instance-id: ${spring.application.name}-${server.port}
+      registry:
+        type: redis
+        redis:
+          host: 127.0.0.1
+          port: 6379
+          password: YourRedisPassword
+          database: 0
+      report:
+        enabled: true
+        interval: 20s
+      trace:
+        enabled: true
+        mdc-enabled: true
+        trace-id-key: traceId
+        request-id-key: requestId
+      virtual:
+        enabled: true
+        default-concurrency-limit: 500
+```
+
+## 业务执行器声明
+
+普通线程池继续以 Spring Bean 方式声明，SDK 会自动托管支持的执行器类型。虚拟线程执行器由业务应用显式声明 `BoundedVirtualThreadExecutor` Bean：
 
 ```java
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.executor.virtual.BoundedVirtualThreadExecutor;
+
 @Configuration
-@EnableConfigurationProperties(DynamicThreadPoolAutoProperties.class)
-public class DynamicThreadPoolAutoConfig {
-    
-    // 1. 创建 Redisson 客户端
-    @Bean("dynamicThreadRedissonClient")
-    public RedissonClient redissonClient(DynamicThreadPoolAutoProperties properties) {
-        // 配置 Redis 连接
-    }
-    
-    // 2. 创建配置调整监听器
-    @Bean
-    public ThreadPoolConfigAdjustListener threadPoolConfigAdjustListener(...) {
-        return new ThreadPoolConfigAdjustListener(...);
-    }
-    
-    // 3. 订阅 Redis Topic，监听配置变更
-    @Bean(name = "dynamicThreadPoolRedisTopic")
-    @DependsOn("dynamicThreadPollService")
-    public RTopic dynamicThreadPoolRedisTopic(...) {
-        RTopic topic = redissonClient.getTopic("DYNAMIC_THREAD_POOL_REDIS_TOPIC_" + applicationName);
-        topic.addListener(ThreadPoolConfigEntity.class, threadPoolConfigAdjustListener);
-        return topic;
-    }
-    
-    // 4. 创建线程池服务
-    @Bean("dynamicThreadPollService")
-    public DynamicThreadPoolService dynamicThreadPollService(...) {
-        // 从 Redis 加载缓存配置，初始化线程池
-    }
-    
-    // 5. 创建定时上报任务
-    @Bean
-    public ThreadPoolDataReportJob threadPoolDataReportJob(...) {
-        return new ThreadPoolDataReportJob(...);
+public class ThreadPoolConfig {
+
+    @Bean("virtualTaskExecutor")
+    public BoundedVirtualThreadExecutor virtualTaskExecutor() {
+        return new BoundedVirtualThreadExecutor("sample-virtual", 100);
     }
 }
 ```
 
-### 2. 动态调整流程
+该 Bean 会以 `ExecutorKind.VIRTUAL_THREAD_PER_TASK` 注册，Admin 通过虚拟线程并发上限接口调整 `concurrencyLimit`。
 
-```
-1. 用户在前端页面修改配置
-         ↓
-2. 前端调用 Admin API (POST /update_thread_pool_config)
-         ↓
-3. Admin 发布消息到 Redis Topic
-         ↓
-4. 应用 SDK 的监听器收到消息
-         ↓
-5. 调用 ThreadPoolExecutor.setCorePoolSize()/setMaximumPoolSize()
-         ↓
-6. 上报最新状态到 Redis
-         ↓
-7. 前端轮询获取最新状态
-```
+## Redis 数据模型
 
-### 3. 定时上报机制
+当前 Redis key 由 `DtpRedisKeys` 统一生成：
 
-```java
-public class ThreadPoolDataReportJob {
-    
-    @Scheduled(cron = "0/20 * * * * ?")  // 每 20 秒执行一次
-    public void execReportThreadPoolList() {
-        // 1. 查询所有线程池状态
-        List<ThreadPoolConfigEntity> entities = dynamicThreadPoolService.queryThreadPoolList();
-        
-        // 2. 上报到 Redis
-        registry.reportThreadPool(entities);
-        
-        // 3. 逐个上报详细配置
-        for (ThreadPoolConfigEntity entity : entities) {
-            registry.reportThreadPoolConfigParameter(entity);
-        }
-    }
-}
-```
+| Key | 说明 |
+|-----|------|
+| `DTP:APPS` | 已注册应用集合 |
+| `DTP:APP:{appName}:INSTANCES` | 应用实例集合 |
+| `DTP:SNAPSHOT:{appName}:{instanceId}:{executorName}` | 单个执行器快照 |
+| `DTP:CHANGE_TOPIC:{appName}` | 应用配置变更 Topic |
+| `DTP:EVENT:{appName}:{yyyyMMdd}` | 应用按日审计事件列表 |
 
-### 4. 配置变更监听器
+## Admin API
 
-```java
-public class ThreadPoolConfigAdjustListener implements MessageListener<ThreadPoolConfigEntity> {
-    
-    @Override
-    public void onMessage(CharSequence charSequence, ThreadPoolConfigEntity config) {
-        // 1. 调整线程池配置
-        dynamicThreadPoolService.updateThreadPoolConfig(config);
-        
-        // 2. 上报最新数据
-        List<ThreadPoolConfigEntity> entities = dynamicThreadPoolService.queryThreadPoolList();
-        registry.reportThreadPool(entities);
-        
-        // 3. 上报单个线程池配置
-        ThreadPoolConfigEntity current = dynamicThreadPoolService.queryThreadPoolConfigByName(
-            config.getThreadPoolName());
-        registry.reportThreadPoolConfigParameter(current);
-    }
-}
-```
-
----
-
-## 🚀 快速开始
-
-### 前置条件
-
-- JDK 17+
-- Maven 3.6+
-- Redis (需配置密码)
-- Node.js 16+
-
-### 1. 配置 Redis
-
-修改配置文件中的 Redis 连接信息：
-
-**Admin 模块** (`dynamic-thread-pool-admin/src/main/resources/application-dev.yml`):
-```yaml
-redis:
-  sdk:
-    config:
-      host: 127.0.0.1
-      port: 6379
-      password: YourRedisPassword
-```
-
-**Test 模块** (`atluofu-dynamic-thread-pool-test/src/main/resources/application-dev.yml`):
-```yaml
-dynamic:
-  thread:
-    pool:
-      config:
-        enable: true
-        host: 127.0.0.1
-        port: 6379
-        password: YourRedisPassword
-```
-
-### 2. 构建项目
-
-```bash
-cd /Users/mario/SelfProject/be/atluofu-dynamic-thread-pool
-mvn clean install -DskipTests
-```
-
-### 3. 启动服务
-
-使用启动脚本：
-```bash
-./start-all.sh
-```
-
-或手动启动：
-
-**启动 Admin 后端** (端口 8089):
-```bash
-cd dynamic-thread-pool-admin
-java -jar target/dynamic-thread-pool-admin-app.jar --spring.profiles.active=dev
-```
-
-**启动 Test 应用** (端口 8093):
-```bash
-cd atluofu-dynamic-thread-pool-test
-java -jar target/dynamic-thread-pool-test-app.jar --spring.profiles.active=dev
-```
-
-**启动前端** (端口 3000):
-```bash
-cd atluofu-dynamic-thread-pool-ui
-npm run dev
-```
-
-### 4. 访问管理界面
-
-浏览器访问：**http://localhost:3000**
-
----
-
-## 📡 API 接口
-
-### Admin 管理后台接口
-
-| 接口 | 方法 | 描述 | 示例 |
-|------|------|------|------|
-| `/api/v1/dynamic/thread/pool/query_thread_pool_list` | GET | 查询线程池列表 | `curl http://localhost:8089/api/v1/dynamic/thread/pool/query_thread_pool_list` |
-| `/api/v1/dynamic/thread/pool/query_thread_pool_config` | GET | 查询线程池配置 | `curl http://localhost:8089/api/v1/dynamic/thread/pool/query_thread_pool_config?appName=xxx&threadPoolName=xxx` |
-| `/api/v1/dynamic/thread/pool/update_thread_pool_config` | POST | 更新线程池配置 | `curl -X POST http://localhost:8089/api/v1/dynamic/thread/pool/update_thread_pool_config -H "Content-Type: application/json" -d '{"appName":"xxx","threadPoolName":"xxx","corePoolSize":20,"maximumPoolSize":50}'` |
-
-### 响应格式
+Admin 控制器统一挂载在 `/api/v1/dtp`。响应保持项目通用包装：
 
 ```json
 {
   "code": "0000",
   "info": "调用成功",
-  "data": [...]
+  "data": {}
 }
 ```
 
----
+接口列表：
 
-## 🧪 测试
-
-### 单元测试
-
-```bash
-# SDK 模块测试
-cd atluofu-dynamic-thread-pool-spring-boot-starter
-mvn test
-
-# Admin 模块测试
-cd dynamic-thread-pool-admin
-mvn test
-```
-
-### 集成测试 & 冒烟测试
-
-```bash
-cd atluofu-dynamic-thread-pool-test
-mvn test -Dtest=ThreadPoolIntegrationTest,SmokeTest
-```
-
-### 测试覆盖
-
-| 模块 | 测试类 | 测试数 | 通过率 |
-|------|--------|--------|--------|
-| SDK | DynamicThreadPoolServiceTest | 8 | ✅ 100% |
-| SDK | ThreadPoolConfigAdjustListenerTest | 4 | ✅ 100% |
-| Admin | DynamicThreadPoolControllerTest | 8 | ✅ 100% |
-| 集成测试 | ThreadPoolIntegrationTest | 5 | ✅ 100% |
-| 冒烟测试 | SmokeTest | 7 | ✅ 100% |
-| **合计** | | **32** | **✅ 100%** |
-
----
-
-## 🔍 核心类说明
-
-### SDK 模块
-
-| 类名 | 作用 |
-|------|------|
-| `DynamicThreadPoolAutoConfig` | SDK 自动配置类，注册所有必要组件 |
-| `DynamicThreadPoolService` | 线程池服务，提供查询和更新方法 |
-| `ThreadPoolConfigAdjustListener` | Redis 消息监听器，接收配置变更 |
-| `ThreadPoolDataReportJob` | 定时上报任务，每 20 秒上报一次状态 |
-| `RedisRegistry` | Redis 注册中心实现，负责数据持久化 |
-| `ThreadPoolConfigEntity` | 线程池配置实体类 |
-
-### Admin 模块
-
-| 类名 | 作用 |
-|------|------|
-| `DynamicThreadPoolController` | REST API 控制器，提供管理接口 |
-| `Application` | 启动类，包含 Redis 配置 |
-
-### 前端模块
-
-| 文件 | 作用 |
-|------|------|
-| `src/views/ThreadPool.vue` | 主页面，展示线程池列表和编辑功能 |
-| `src/api/threadPool.js` | API 接口封装 |
-| `src/utils/request.js` | Axios 请求封装 |
-
----
-
-## 📊 线程池状态字段
-
-| 字段 | 说明 | 示例 |
+| 接口 | 方法 | 说明 |
 |------|------|------|
-| `appName` | 应用名称 | `dynamic-thread-pool-test-app` |
-| `threadPoolName` | 线程池名称 | `threadPoolExecutor01` |
-| `corePoolSize` | 核心线程数 | `20` |
-| `maximumPoolSize` | 最大线程数 | `50` |
-| `activeCount` | 活跃线程数 | `5` |
-| `poolSize` | 当前池中线程数 | `20` |
-| `queueType` | 队列类型 | `LinkedBlockingQueue` |
-| `queueSize` | 队列任务数 | `100` |
-| `remainingCapacity` | 队列剩余容量 | `4900` |
+| `/api/v1/dtp/apps` | GET | 查询应用集合 |
+| `/api/v1/dtp/apps/{appName}/instances` | GET | 查询应用实例集合 |
+| `/api/v1/dtp/apps/{appName}/instances/{instanceId}/executors` | GET | 查询实例执行器快照列表 |
+| `/api/v1/dtp/apps/{appName}/instances/{instanceId}/executors/{executorName}` | GET | 查询单个执行器快照 |
+| `/api/v1/dtp/apps/{appName}/instances/{instanceId}/executors/{executorName}/resize` | POST | 调整平台线程池容量 |
+| `/api/v1/dtp/apps/{appName}/instances/{instanceId}/executors/{executorName}/virtual-limit` | POST | 调整虚拟线程执行器并发上限 |
+| `/api/v1/dtp/events?appName={appName}&date={yyyyMMdd}` | GET | 查询审计事件 |
 
----
+平台线程池调整示例：
 
-## ⚠️ 注意事项
+```bash
+curl -X POST "http://localhost:8089/api/v1/dtp/apps/dynamic-thread-pool-test-app/instances/dynamic-thread-pool-test-app-8093/executors/threadPoolExecutor01/resize" \
+  -H "Content-Type: application/json" \
+  -d '{"corePoolSize":20,"maximumPoolSize":50,"keepAliveSeconds":60,"allowCoreThreadTimeOut":false,"operator":"admin"}'
+```
 
-1. **Redis 密码配置**：确保配置文件中的 Redis 密码正确
-2. **Bean 初始化顺序**：使用 `@DependsOn` 确保正确的初始化顺序
-3. **配置属性名称**：使用 `enable` 而非 `enabled`
-4. **主类配置**：确保 pom.xml 中的主类包名正确
-5. **前端代理**：Vite 配置了 API 代理到后端 (8089 端口)
+虚拟线程并发上限调整示例：
 
----
+```bash
+curl -X POST "http://localhost:8089/api/v1/dtp/apps/dynamic-thread-pool-test-app/instances/dynamic-thread-pool-test-app-8093/executors/virtualTaskExecutor/virtual-limit" \
+  -H "Content-Type: application/json" \
+  -d '{"concurrencyLimit":100,"operator":"admin"}'
+```
 
-## 🛠️ 常见问题
+## 本地构建
 
-### 1. Redis 连接失败
-**错误**：`NOAUTH Authentication required`
-**解决**：在配置文件中设置正确的 Redis 密码
+安装后端依赖并打包：
 
-### 2. 端口被占用
-**错误**：`Port 8089/8093/3000 is already in use`
-**解决**：修改对应服务的端口配置或关闭占用端口的进程
+```bash
+mvn clean package
+```
 
-### 3. 前端无法连接后端
-**解决**：检查 `vite.config.js` 中的代理配置是否正确
+构建前端：
 
-### 4. Test 应用启动失败
-**错误**：`IllegalArgumentException` in `ThreadPoolExecutor`
-**解决**：清理 Redis 数据后重启 `redis-cli -a password FLUSHDB`
+```bash
+npm --prefix atluofu-dynamic-thread-pool-ui install
+npm --prefix atluofu-dynamic-thread-pool-ui run build
+```
 
----
+## 验证命令
 
-## 📝 更新日志
+升级计划要求的完整验证命令：
 
-### v1.0.0 (2026-03-31)
-- ✅ 修复日志字段错误（poolSize → corePoolSize）
-- ✅ 修复上报数据使用最新状态
-- ✅ 修复空对象返回问题
-- ✅ 修复 Bean 方法名重复问题
-- ✅ 添加 `@DependsOn` 确保初始化顺序
-- ✅ 创建 Vue 3 前端管理界面
-- ✅ 添加完整的单元测试和集成测试
+```bash
+mvn clean test
+mvn clean package
+npm --prefix atluofu-dynamic-thread-pool-ui run build
+```
 
----
+说明：示例应用依赖 Redis。运行 SpringBootTest 或手动启动示例应用前，请确保 `application-dev.yml` 中的 Redis 地址、端口、密码和库号可用。
 
-## 📄 License
+## 运行入口
 
-MIT
+打包完成后可分别启动 Admin、示例应用和前端开发服务。不要在验证命令中自动启动应用。
 
----
+Admin：
 
-## 👥 作者
+```bash
+java -jar dynamic-thread-pool-admin/target/dynamic-thread-pool-admin-app.jar --spring.profiles.active=dev
+```
 
-有罗敷的马同学 / atluofu
+示例应用：
 
----
+```bash
+java -jar atluofu-dynamic-thread-pool-test/target/dynamic-thread-pool-test-app.jar --spring.profiles.active=dev
+```
 
-## 🔗 相关链接
+前端开发服务：
 
-- [Redisson 文档](https://github.com/redisson/redisson)
-- [Vue 3 文档](https://vuejs.org/)
-- [Element Plus 文档](https://element-plus.org/)
-- [Spring Boot 文档](https://spring.io/projects/spring-boot)
+```bash
+npm --prefix atluofu-dynamic-thread-pool-ui run dev
+```
+
+## 核心类
+
+| 类名 | 作用 |
+|------|------|
+| `DynamicThreadPoolAutoConfig` | SDK 自动配置入口，注册 Redisson、执行器注册表、服务、监听器和上报任务 |
+| `DynamicThreadPoolAutoProperties` | `atluofu.dynamic.thread-pool` 配置属性 |
+| `DynamicThreadPoolService` | 查询 `ExecutorSnapshot`，执行 `ExecutorUpdateCommand` |
+| `ManagedExecutorRegistry` | 托管执行器注册表 |
+| `ThreadPoolExecutorManagedExecutor` | `ThreadPoolExecutor` 适配器 |
+| `ThreadPoolTaskExecutorManagedExecutor` | Spring `ThreadPoolTaskExecutor` 适配器 |
+| `BoundedVirtualThreadManagedExecutor` | `BoundedVirtualThreadExecutor` 适配器 |
+| `RedisRegistry` | Redis 注册中心，负责快照、变更消息和审计事件 |
+| `DynamicThreadPoolController` | Admin REST API |
+
+## 执行器快照字段
+
+| 字段 | 说明 |
+|------|------|
+| `appName` | 应用名称 |
+| `instanceId` | 应用实例 ID |
+| `executorName` | Spring Bean 名称 |
+| `executorKind` | 执行器类型 |
+| `virtual` | 是否虚拟线程执行器 |
+| `resizable` | 是否支持容量调整 |
+| `corePoolSize` / `maximumPoolSize` | 平台线程池容量 |
+| `activeCount` / `poolSize` | 平台线程池运行线程数 |
+| `queueType` / `queueSize` / `remainingCapacity` | 队列信息 |
+| `concurrencyLimit` / `availablePermits` | 虚拟线程并发限制 |
+| `runningTasks` / `submittedTasks` / `completedTaskCount` / `failedTasks` / `rejectedTasks` | 任务统计 |
+| `reportTime` | 快照生成时间 |
+
+## 常见问题
+
+### Redis 连接失败
+
+检查业务应用和 Admin 的 Redis 配置是否一致，尤其是密码和 database。
+
+### 查询不到执行器
+
+确认业务应用已启动并接入 SDK，`atluofu.dynamic.thread-pool.enabled` 为 `true`，并且上报任务已写入 `DTP:SNAPSHOT:{appName}:{instanceId}:{executorName}`。
+
+### 虚拟线程执行器不能 resize
+
+虚拟线程执行器不使用 `corePoolSize` 和 `maximumPoolSize`。请使用 `/virtual-limit` 接口调整 `concurrencyLimit`。

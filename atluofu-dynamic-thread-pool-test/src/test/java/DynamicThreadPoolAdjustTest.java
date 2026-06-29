@@ -5,11 +5,17 @@ import org.redisson.api.RTopic;
 import org.springframework.boot.test.context.SpringBootTest;
 import top.atluofu.Application;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.IDynamicThreadPoolService;
-import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ExecutorSnapshot;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ExecutorUpdateCommand;
 
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static top.atluofu.middleware.dynamic.thread.pool.support.DtpSampleTestSupport.THREAD_POOL_EXECUTOR_01;
+import static top.atluofu.middleware.dynamic.thread.pool.support.DtpSampleTestSupport.assertVirtualExecutorRegistered;
+import static top.atluofu.middleware.dynamic.thread.pool.support.DtpSampleTestSupport.changeMessage;
+import static top.atluofu.middleware.dynamic.thread.pool.support.DtpSampleTestSupport.requireSnapshot;
+import static top.atluofu.middleware.dynamic.thread.pool.support.DtpSampleTestSupport.resizeCommand;
 
 /**
  * @ClassName: DynamicThreadPoolAdjustTest
@@ -29,38 +35,49 @@ public class DynamicThreadPoolAdjustTest {
     private IDynamicThreadPoolService dynamicThreadPoolService;
 
     /**
-     * 测试 1：查询线程池列表
+     * 测试 1：查询执行器列表
      */
     @Test
     public void test_queryThreadPoolList() {
-        log.info("========== 测试 1：查询线程池列表 ==========");
-        List<ThreadPoolConfigEntity> threadPoolList = dynamicThreadPoolService.queryThreadPoolList();
-        
-        for (ThreadPoolConfigEntity entity : threadPoolList) {
-            log.info("线程池名称：{}, 核心线程数：{}, 最大线程数：{}, 活跃线程数：{}, 队列大小：{}", 
-                    entity.getThreadPoolName(), 
-                    entity.getCorePoolSize(), 
-                    entity.getMaximumPoolSize(),
-                    entity.getActiveCount(),
-                    entity.getQueueSize());
+        log.info("========== 测试 1：查询执行器列表 ==========");
+        List<ExecutorSnapshot> snapshots = dynamicThreadPoolService.queryExecutorSnapshots();
+
+        assertThat(snapshots).isNotEmpty();
+        assertVirtualExecutorRegistered(snapshots);
+
+        for (ExecutorSnapshot snapshot : snapshots) {
+            log.info("执行器名称：{}, 类型：{}, 核心线程数：{}, 最大线程数：{}, 活跃线程数：{}, 队列大小：{}, 并发上限：{}",
+                    snapshot.getExecutorName(),
+                    snapshot.getExecutorKind(),
+                    snapshot.getCorePoolSize(),
+                    snapshot.getMaximumPoolSize(),
+                    snapshot.getActiveCount(),
+                    snapshot.getQueueSize(),
+                    snapshot.getConcurrencyLimit());
         }
-        
-        log.info("线程池总数：{}", threadPoolList.size());
+
+        log.info("执行器总数：{}", snapshots.size());
     }
 
     /**
-     * 测试 2：根据名称查询线程池配置
+     * 测试 2：根据名称查询执行器快照
      */
     @Test
     public void test_queryThreadPoolConfigByName() {
-        log.info("========== 测试 2：根据名称查询线程池配置 ==========");
-        ThreadPoolConfigEntity entity = dynamicThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01");
-        
-        log.info("线程池名称：{}, 应用名：{}, 核心线程数：{}, 最大线程数：{}", 
-                entity.getThreadPoolName(), 
-                entity.getAppName(),
-                entity.getCorePoolSize(), 
-                entity.getMaximumPoolSize());
+        log.info("========== 测试 2：根据名称查询执行器快照 ==========");
+        ExecutorSnapshot snapshot = requireSnapshot(dynamicThreadPoolService, THREAD_POOL_EXECUTOR_01);
+
+        assertThat(snapshot.getAppName()).isNotBlank();
+        assertThat(snapshot.getInstanceId()).isNotBlank();
+        assertThat(snapshot.getCorePoolSize()).isPositive();
+        assertThat(snapshot.getMaximumPoolSize()).isGreaterThanOrEqualTo(snapshot.getCorePoolSize());
+
+        log.info("执行器名称：{}, 应用名：{}, 实例：{}, 核心线程数：{}, 最大线程数：{}",
+                snapshot.getExecutorName(),
+                snapshot.getAppName(),
+                snapshot.getInstanceId(),
+                snapshot.getCorePoolSize(),
+                snapshot.getMaximumPoolSize());
     }
 
     /**
@@ -69,50 +86,44 @@ public class DynamicThreadPoolAdjustTest {
     @Test
     public void test_adjustThreadPoolConfig() throws InterruptedException {
         log.info("========== 测试 3：动态调整线程池配置 ==========");
-        
-        // 调整前的配置
-        ThreadPoolConfigEntity beforeConfig = dynamicThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01");
-        log.info("调整前 - 核心线程数：{}, 最大线程数：{}", 
+
+        ExecutorSnapshot beforeConfig = requireSnapshot(dynamicThreadPoolService, THREAD_POOL_EXECUTOR_01);
+        log.info("调整前 - 核心线程数：{}, 最大线程数：{}",
                 beforeConfig.getCorePoolSize(), beforeConfig.getMaximumPoolSize());
-        
-        // 发布新的配置
-        ThreadPoolConfigEntity newConfig = new ThreadPoolConfigEntity("dynamic-thread-pool-test-app", "threadPoolExecutor01");
-        newConfig.setCorePoolSize(30);
-        newConfig.setMaximumPoolSize(80);
-        
-        log.info("发布新配置 - 核心线程数：{}, 最大线程数：{}", 
-                newConfig.getCorePoolSize(), newConfig.getMaximumPoolSize());
-        dynamicThreadPoolRedisTopic.publish(newConfig);
-        
-        // 等待配置生效
-        Thread.sleep(2000);
-        
-        // 调整后的配置
-        ThreadPoolConfigEntity afterConfig = dynamicThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01");
-        log.info("调整后 - 核心线程数：{}, 最大线程数：{}", 
-                afterConfig.getCorePoolSize(), afterConfig.getMaximumPoolSize());
-        
-        // 验证调整是否成功
-        if (afterConfig.getCorePoolSize() == 30 && afterConfig.getMaximumPoolSize() == 80) {
-            log.info("✓ 动态调整成功！");
-        } else {
-            log.error("✗ 动态调整失败！期望核心线程数=30, 最大线程数=80, 实际核心线程数={}, 最大线程数={}", 
+
+        try {
+            ExecutorUpdateCommand newConfig = resizeCommand(beforeConfig, 30, 80);
+
+            log.info("发布新配置 - 核心线程数：{}, 最大线程数：{}",
+                    newConfig.getCorePoolSize(), newConfig.getMaximumPoolSize());
+            dynamicThreadPoolRedisTopic.publish(changeMessage(newConfig));
+
+            Thread.sleep(2000);
+
+            ExecutorSnapshot afterConfig = requireSnapshot(dynamicThreadPoolService, THREAD_POOL_EXECUTOR_01);
+            log.info("调整后 - 核心线程数：{}, 最大线程数：{}",
                     afterConfig.getCorePoolSize(), afterConfig.getMaximumPoolSize());
+
+            assertThat(afterConfig.getCorePoolSize()).isEqualTo(30);
+            assertThat(afterConfig.getMaximumPoolSize()).isEqualTo(80);
+        } finally {
+            ExecutorUpdateCommand restoreConfig = resizeCommand(beforeConfig,
+                    beforeConfig.getCorePoolSize(), beforeConfig.getMaximumPoolSize());
+            dynamicThreadPoolRedisTopic.publish(changeMessage(restoreConfig));
+            Thread.sleep(1000);
         }
-        
-        new CountDownLatch(1).await(5, TimeUnit.SECONDS);
     }
 
     /**
-     * 测试 4：查询不存在的线程池
+     * 测试 4：查询不存在的执行器
      */
     @Test
     public void test_queryNonExistentThreadPool() {
-        log.info("========== 测试 4：查询不存在的线程池 ==========");
-        ThreadPoolConfigEntity entity = dynamicThreadPoolService.queryThreadPoolConfigByName("nonExistentPool");
-        
-        log.info("查询结果 - 应用名：{}, 线程池名称：{}", entity.getAppName(), entity.getThreadPoolName());
-        log.info("核心线程数：{}, 最大线程数：{} (应为 0)", entity.getCorePoolSize(), entity.getMaximumPoolSize());
+        log.info("========== 测试 4：查询不存在的执行器 ==========");
+        ExecutorSnapshot snapshot = dynamicThreadPoolService.queryExecutorSnapshot("nonExistentPool");
+
+        assertThat(snapshot).isNull();
+        log.info("查询不存在的执行器返回 null");
     }
 
 }
