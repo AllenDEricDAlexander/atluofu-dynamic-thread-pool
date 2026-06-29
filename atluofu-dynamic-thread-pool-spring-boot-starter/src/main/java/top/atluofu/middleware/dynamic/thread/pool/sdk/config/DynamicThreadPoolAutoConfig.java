@@ -62,21 +62,23 @@ public class DynamicThreadPoolAutoConfig {
         // 使用自定义 ObjectMapper 的 JsonJacksonCodec
         config.setCodec(new JsonJacksonCodec(objectMapper));
 
+        DynamicThreadPoolAutoProperties.Redis redis = properties.getRegistry().getRedis();
         config.useSingleServer()
-                .setAddress("redis://" + properties.getHost() + ":" + properties.getPort())
-                .setPassword(properties.getPassword())
-                .setConnectionPoolSize(properties.getPoolSize())
-                .setConnectionMinimumIdleSize(properties.getMinIdleSize())
-                .setIdleConnectionTimeout(properties.getIdleTimeout())
-                .setConnectTimeout(properties.getConnectTimeout())
-                .setRetryAttempts(properties.getRetryAttempts())
-                .setRetryInterval(properties.getRetryInterval())
-                .setPingConnectionInterval(properties.getPingInterval())
-                .setKeepAlive(properties.isKeepAlive())
+                .setAddress("redis://" + redis.getHost() + ":" + redis.getPort())
+                .setPassword(redis.getPassword())
+                .setDatabase(redis.getDatabase())
+                .setConnectionPoolSize(redis.getPoolSize())
+                .setConnectionMinimumIdleSize(redis.getMinIdleSize())
+                .setIdleConnectionTimeout(redis.getIdleTimeout())
+                .setConnectTimeout(redis.getConnectTimeout())
+                .setRetryAttempts(redis.getRetryAttempts())
+                .setRetryInterval(redis.getRetryInterval())
+                .setPingConnectionInterval(redis.getPingInterval())
+                .setKeepAlive(redis.isKeepAlive())
         ;
 
         RedissonClient redissonClient = Redisson.create(config);
-        log.info("动态线程池，注册器（redis）链接初始化完成。{} {} {}", properties.getHost(), properties.getPoolSize(), !redissonClient.isShutdown());
+        log.info("动态线程池，注册器（redis）链接初始化完成。{} {} {}", redis.getHost(), redis.getPoolSize(), !redissonClient.isShutdown());
         return redissonClient;
     }
 

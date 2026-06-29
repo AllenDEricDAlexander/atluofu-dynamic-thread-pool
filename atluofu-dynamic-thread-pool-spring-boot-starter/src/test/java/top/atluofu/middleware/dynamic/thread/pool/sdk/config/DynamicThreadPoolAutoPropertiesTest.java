@@ -1,38 +1,50 @@
 package top.atluofu.middleware.dynamic.thread.pool.sdk.config;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Configuration;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * @description DynamicThreadPoolAutoProperties 简单属性测试
+ * @description DynamicThreadPoolAutoProperties 属性绑定测试
  */
-public class DynamicThreadPoolAutoPropertiesTest {
+class DynamicThreadPoolAutoPropertiesTest {
+
+    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withUserConfiguration(PropertiesConfiguration.class)
+            .withPropertyValues(
+                    "spring.application.name=test-app",
+                    "server.port=8093",
+                    "atluofu.dynamic.thread-pool.enabled=true",
+                    "atluofu.dynamic.thread-pool.registry.redis.host=127.0.0.1",
+                    "atluofu.dynamic.thread-pool.registry.redis.port=6379",
+                    "atluofu.dynamic.thread-pool.registry.redis.password=pwd",
+                    "atluofu.dynamic.thread-pool.report.interval=20s",
+                    "atluofu.dynamic.thread-pool.trace.trace-id-key=traceId",
+                    "atluofu.dynamic.thread-pool.trace.request-id-key=requestId",
+                    "atluofu.dynamic.thread-pool.virtual.default-concurrency-limit=500"
+            );
 
     @Test
-    public void test_defaultValuesAndSetters() {
-        DynamicThreadPoolAutoProperties properties = new DynamicThreadPoolAutoProperties();
+    void shouldBindNewPrefix() {
+        contextRunner.run(context -> {
+            DynamicThreadPoolAutoProperties properties = context.getBean(DynamicThreadPoolAutoProperties.class);
 
-        // 默认值校验
-        assertEquals(64, properties.getPoolSize());
-        assertEquals(10, properties.getMinIdleSize());
-        assertEquals(10000, properties.getIdleTimeout());
-        assertEquals(10000, properties.getConnectTimeout());
-        assertEquals(3, properties.getRetryAttempts());
-        assertEquals(1000, properties.getRetryInterval());
-        assertEquals(0, properties.getPingInterval());
-        assertTrue(properties.isKeepAlive());
+            assertThat(properties.isEnabled()).isTrue();
+            assertThat(properties.getRegistry().getRedis().getHost()).isEqualTo("127.0.0.1");
+            assertThat(properties.getRegistry().getRedis().getPort()).isEqualTo(6379);
+            assertThat(properties.getRegistry().getRedis().getPassword()).isEqualTo("pwd");
+            assertThat(properties.getReport().getInterval()).hasSeconds(20);
+            assertThat(properties.getTrace().getTraceIdKey()).isEqualTo("traceId");
+            assertThat(properties.getTrace().getRequestIdKey()).isEqualTo("requestId");
+            assertThat(properties.getVirtual().getDefaultConcurrencyLimit()).isEqualTo(500);
+        });
+    }
 
-        // setter/getter 校验（挑几个关键字段）
-        properties.setEnable(true);
-        properties.setHost("127.0.0.1");
-        properties.setPort(6379);
-        properties.setPassword("pwd");
-
-        assertTrue(properties.isEnable());
-        assertEquals("127.0.0.1", properties.getHost());
-        assertEquals(6379, properties.getPort());
-        assertEquals("pwd", properties.getPassword());
+    @Configuration
+    @EnableConfigurationProperties(DynamicThreadPoolAutoProperties.class)
+    static class PropertiesConfiguration {
     }
 }
-
