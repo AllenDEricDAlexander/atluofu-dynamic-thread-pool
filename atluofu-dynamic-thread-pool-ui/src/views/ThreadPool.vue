@@ -133,8 +133,11 @@
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item v-if="!isVirtualExecutor(editForm)" label="核心超时">
+        <el-form-item v-if="!isVirtualExecutor(editForm) && hasKnownValue(editForm.allowCoreThreadTimeOut)" label="核心超时">
           <el-switch v-model="editForm.allowCoreThreadTimeOut" />
+        </el-form-item>
+        <el-form-item v-if="!isVirtualExecutor(editForm) && !hasKnownValue(editForm.allowCoreThreadTimeOut)" label="核心超时">
+          <el-input placeholder="未知" disabled />
         </el-form-item>
         <el-form-item v-if="isVirtualExecutor(editForm)" label="并发限制">
           <el-input-number
@@ -191,8 +194,8 @@ const editForm = ref({
   executorKind: '',
   corePoolSize: null,
   maximumPoolSize: null,
-  keepAliveSeconds: 0,
-  allowCoreThreadTimeOut: false,
+  keepAliveSeconds: null,
+  allowCoreThreadTimeOut: null,
   activeCount: null,
   poolSize: null,
   queueSize: null,
@@ -211,6 +214,10 @@ const formatValue = value => value === null || value === undefined ? '-' : value
 const formatColumnValue = (row, column, cellValue) => formatValue(cellValue)
 
 const isVirtualExecutor = row => row.executorKind === 'VIRTUAL_THREAD_PER_TASK'
+
+const hasKnownValue = value => value !== null && value !== undefined
+
+const hasPayloadValue = value => value !== null && value !== undefined && value !== ''
 
 // 获取活跃线程类型
 const getActiveType = (activeCount, maximumPoolSize) => {
@@ -321,8 +328,8 @@ const openEditDialog = async (row) => {
       executorKind: data.executorKind || row.executorKind,
       corePoolSize: data.corePoolSize ?? row.corePoolSize ?? null,
       maximumPoolSize: data.maximumPoolSize ?? row.maximumPoolSize ?? null,
-      keepAliveSeconds: data.keepAliveSeconds ?? row.keepAliveSeconds ?? 0,
-      allowCoreThreadTimeOut: data.allowCoreThreadTimeOut ?? row.allowCoreThreadTimeOut ?? false,
+      keepAliveSeconds: data.keepAliveSeconds ?? row.keepAliveSeconds ?? null,
+      allowCoreThreadTimeOut: data.allowCoreThreadTimeOut ?? row.allowCoreThreadTimeOut ?? null,
       activeCount: data.activeCount ?? row.activeCount ?? null,
       poolSize: data.poolSize ?? row.poolSize ?? null,
       queueSize: data.queueSize ?? row.queueSize ?? null,
@@ -352,13 +359,18 @@ const handleUpdate = async () => {
         operator: 'admin'
       })
     } else {
-      await resizeExecutor(editForm.value.appName, editForm.value.instanceId, editForm.value.executorName, {
+      const resizePayload = {
         corePoolSize: editForm.value.corePoolSize,
         maximumPoolSize: editForm.value.maximumPoolSize,
-        keepAliveSeconds: editForm.value.keepAliveSeconds,
-        allowCoreThreadTimeOut: editForm.value.allowCoreThreadTimeOut,
         operator: 'admin'
-      })
+      }
+      if (hasPayloadValue(editForm.value.keepAliveSeconds)) {
+        resizePayload.keepAliveSeconds = editForm.value.keepAliveSeconds
+      }
+      if (hasKnownValue(editForm.value.allowCoreThreadTimeOut)) {
+        resizePayload.allowCoreThreadTimeOut = editForm.value.allowCoreThreadTimeOut
+      }
+      await resizeExecutor(editForm.value.appName, editForm.value.instanceId, editForm.value.executorName, resizePayload)
     }
     ElMessage.success('配置更新成功')
     editDialogVisible.value = false
