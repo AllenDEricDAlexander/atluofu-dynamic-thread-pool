@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.slf4j.MDC;
 
 import java.io.Serializable;
 
@@ -18,7 +19,39 @@ public class Response<T> implements Serializable {
 
     private String code;
     private String info;
+    @Builder.Default
+    private String traceId = MDC.get("traceId");
     private T data;
+
+    public static <T> Response<T> success(T data) {
+        return Response.<T>builder()
+                .code(Code.SUCCESS.getCode())
+                .info(Code.SUCCESS.getInfo())
+                .traceId(MDC.get("traceId"))
+                .data(data)
+                .build();
+    }
+
+    public static <T> Response<T> error(String info) {
+        return Response.<T>builder()
+                .code(Code.ILLEGAL_PARAMETER.getCode())
+                .info(info)
+                .traceId(MDC.get("traceId"))
+                .build();
+    }
+
+    public static <T> Response<T> fail(String info) {
+        return Response.<T>builder()
+                .code(Code.UN_ERROR.getCode())
+                .info(info)
+                .traceId(MDC.get("traceId"))
+                .build();
+    }
+
+    public Response<T> setDataValue(T data) {
+        this.data = data;
+        return this;
+    }
 
     @AllArgsConstructor
     @NoArgsConstructor
@@ -35,4 +68,3 @@ public class Response<T> implements Serializable {
     }
 
 }
-

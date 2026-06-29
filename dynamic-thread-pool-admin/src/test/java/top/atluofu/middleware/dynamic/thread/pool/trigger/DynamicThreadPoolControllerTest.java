@@ -1,24 +1,52 @@
 package top.atluofu.middleware.dynamic.thread.pool.trigger;
 
-import com.alibaba.fastjson2.JSON;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.redisson.api.RBucket;
+import org.redisson.api.RKeys;
 import org.redisson.api.RList;
+import org.redisson.api.RSet;
 import org.redisson.api.RTopic;
 import org.redisson.api.RedissonClient;
-import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
+import org.slf4j.MDC;
+import org.springframework.mock.web.MockFilterChain;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import top.atluofu.middleware.dynamic.thread.pool.config.DtpTraceIdFilter;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ExecutorSnapshot;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ExecutorUpdateCommand;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.valobj.ExecutorKind;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.model.DtpAuditEvent;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.model.DtpConfigChangeMessage;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.model.DtpRedisKeys;
+import top.atluofu.middleware.dynamic.thread.pool.trigger.model.ResizeExecutorRequest;
+import top.atluofu.middleware.dynamic.thread.pool.trigger.model.VirtualLimitRequest;
 import top.atluofu.middleware.dynamic.thread.pool.types.Response;
 
-import java.util.ArrayList;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * @ClassName: DynamicThreadPoolControllerTest
@@ -34,10 +62,16 @@ public class DynamicThreadPoolControllerTest {
     private RedissonClient mockRedissonClient;
 
     @Mock
-    private RList mockRList;
+    private RSet<String> mockRSet;
 
     @Mock
-    private RBucket mockRBucket;
+    private RKeys mockRKeys;
+
+    @Mock
+    private RBucket<ExecutorSnapshot> mockRBucket;
+
+    @Mock
+    private RList<DtpAuditEvent> mockRList;
 
     @Mock
     private RTopic mockRTopic;
@@ -45,145 +79,206 @@ public class DynamicThreadPoolControllerTest {
     @InjectMocks
     private DynamicThreadPoolController controller;
 
-    /**
-     * 测试 1：查询线程池列表 - 成功
-     */
+    @AfterEach
+    public void tearDown() {
+        MDC.clear();
+    }
+
     @Test
-    public void test_queryThreadPoolList_Success() {
-        List<ThreadPoolConfigEntity> mockList = new ArrayList<>();
-        ThreadPoolConfigEntity entity = new ThreadPoolConfigEntity("test-app", "threadPoolExecutor01");
-        entity.setCorePoolSize(10);
-        entity.setMaximumPoolSize(50);
-        mockList.add(entity);
+    public void shouldQueryApps() {
+        when(mockRedissonClient.<String>getSet(DtpRedisKeys.apps())).thenReturn(mockRSet);
+        when(mockRSet.readAll()).thenReturn(Set.of("order-app"));
 
-        when(mockRedissonClient.getList("THREAD_POOL_CONFIG_LIST_KEY")).thenReturn(mockRList);
-        when(mockRList.readAll()).thenReturn(mockList);
-
-        Response<List<ThreadPoolConfigEntity>> response = controller.queryThreadPoolList();
+        Response<Set<String>> response = controller.queryApps();
 
         assertEquals(Response.Code.SUCCESS.getCode(), response.getCode());
-        assertEquals(Response.Code.SUCCESS.getInfo(), response.getInfo());
-        assertNotNull(response.getData());
+        assertEquals(Set.of("order-app"), response.getData());
+    }
+
+    @Test
+    public void shouldQueryInstances() {
+        when(mockRedissonClient.<String>getSet(DtpRedisKeys.instances("order-app"))).thenReturn(mockRSet);
+        when(mockRSet.readAll()).thenReturn(Set.of("order-8093"));
+
+        Response<Set<String>> response = controller.queryInstances("order-app");
+
+        assertEquals(Response.Code.SUCCESS.getCode(), response.getCode());
+        assertEquals(Set.of("order-8093"), response.getData());
+    }
+
+    @Test
+    public void shouldQueryExecutors() {
+        ExecutorSnapshot snapshot = new ExecutorSnapshot();
+        snapshot.setExecutorName("orderExecutor");
+        String snapshotKey = DtpRedisKeys.snapshot("order-app", "order-8093", "orderExecutor");
+        when(mockRedissonClient.getKeys()).thenReturn(mockRKeys);
+        when(mockRKeys.getKeysByPattern(DtpRedisKeys.snapshot("order-app", "order-8093", "*"))).thenReturn(List.of(snapshotKey));
+        when(mockRedissonClient.<ExecutorSnapshot>getBucket(snapshotKey)).thenReturn(mockRBucket);
+        when(mockRBucket.get()).thenReturn(snapshot);
+
+        Response<List<ExecutorSnapshot>> response = controller.queryExecutors("order-app", "order-8093");
+
+        assertEquals(Response.Code.SUCCESS.getCode(), response.getCode());
         assertEquals(1, response.getData().size());
-        assertEquals("test-app", response.getData().get(0).getAppName());
+        assertSame(snapshot, response.getData().get(0));
     }
 
-    /**
-     * 测试 2：查询线程池列表 - 异常
-     */
     @Test
-    public void test_queryThreadPoolList_Exception() {
-        when(mockRedissonClient.getList("THREAD_POOL_CONFIG_LIST_KEY")).thenThrow(new RuntimeException("Redis 连接失败"));
+    public void shouldQueryExecutor() {
+        ExecutorSnapshot snapshot = new ExecutorSnapshot();
+        snapshot.setExecutorName("orderExecutor");
+        when(mockRedissonClient.<ExecutorSnapshot>getBucket(DtpRedisKeys.snapshot("order-app", "order-8093", "orderExecutor"))).thenReturn(mockRBucket);
+        when(mockRBucket.get()).thenReturn(snapshot);
 
-        Response<List<ThreadPoolConfigEntity>> response = controller.queryThreadPoolList();
-
-        assertEquals(Response.Code.UN_ERROR.getCode(), response.getCode());
-        assertEquals(Response.Code.UN_ERROR.getInfo(), response.getInfo());
-    }
-
-    /**
-     * 测试 3：查询线程池配置 - 成功
-     */
-    @Test
-    public void test_queryThreadPoolConfig_Success() {
-        ThreadPoolConfigEntity entity = new ThreadPoolConfigEntity("test-app", "threadPoolExecutor01");
-        entity.setCorePoolSize(20);
-        entity.setMaximumPoolSize(80);
-        entity.setActiveCount(5);
-
-        String cacheKey = "THREAD_POOL_CONFIG_PARAMETER_LIST_KEY_test-app_threadPoolExecutor01";
-        when(mockRedissonClient.getBucket(anyString())).thenReturn(mockRBucket);
-        when(mockRBucket.get()).thenReturn(entity);
-
-        Response<ThreadPoolConfigEntity> response = controller.queryThreadPoolConfig("test-app", "threadPoolExecutor01");
+        Response<ExecutorSnapshot> response = controller.queryExecutor("order-app", "order-8093", "orderExecutor");
 
         assertEquals(Response.Code.SUCCESS.getCode(), response.getCode());
-        assertNotNull(response.getData());
-        assertEquals(20, response.getData().getCorePoolSize());
-        assertEquals(80, response.getData().getMaximumPoolSize());
-        assertEquals(5, response.getData().getActiveCount());
+        assertSame(snapshot, response.getData());
     }
 
-    /**
-     * 测试 4：查询线程池配置 - 配置不存在
-     */
     @Test
-    public void test_queryThreadPoolConfig_NotFound() {
-        String cacheKey = "THREAD_POOL_CONFIG_PARAMETER_LIST_KEY_test-app_nonExistent";
-        when(mockRedissonClient.getBucket(anyString())).thenReturn(mockRBucket);
-        when(mockRBucket.get()).thenReturn(null);
+    public void shouldPublishResizeMessage() {
+        MDC.put("traceId", "trace-001");
+        MDC.put("requestId", "request-001");
+        ResizeExecutorRequest request = new ResizeExecutorRequest();
+        request.setCorePoolSize(4);
+        request.setMaximumPoolSize(16);
+        request.setKeepAliveSeconds(30L);
+        request.setAllowCoreThreadTimeOut(true);
+        request.setOperator("admin");
+        when(mockRedissonClient.getTopic(DtpRedisKeys.changeTopic("order-app"))).thenReturn(mockRTopic);
 
-        Response<ThreadPoolConfigEntity> response = controller.queryThreadPoolConfig("test-app", "nonExistent");
+        Response<Boolean> response = controller.resizeExecutor("order-app", "order-8093", "orderExecutor", request);
 
         assertEquals(Response.Code.SUCCESS.getCode(), response.getCode());
-        assertNull(response.getData());
+        assertEquals("trace-001", response.getTraceId());
+        assertTrue(response.getData());
+        ArgumentCaptor<DtpConfigChangeMessage> captor = ArgumentCaptor.forClass(DtpConfigChangeMessage.class);
+        verify(mockRTopic).publish(captor.capture());
+        DtpConfigChangeMessage message = captor.getValue();
+        assertNotNull(message.getMessageId());
+        assertEquals("trace-001", message.getTraceId());
+        assertEquals("request-001", message.getRequestId());
+        assertEquals("order-app", message.getAppName());
+        assertEquals("order-8093", message.getInstanceId());
+        assertEquals("orderExecutor", message.getExecutorName());
+        assertEquals(ExecutorKind.PLATFORM_THREAD_POOL, message.getExecutorKind());
+        assertEquals("admin", message.getOperator());
+        assertNotNull(message.getTimestamp());
+        ExecutorUpdateCommand command = message.getPayload();
+        assertEquals("order-app", command.getAppName());
+        assertEquals("order-8093", command.getInstanceId());
+        assertEquals("orderExecutor", command.getExecutorName());
+        assertEquals(ExecutorKind.PLATFORM_THREAD_POOL, command.getExecutorKind());
+        assertEquals(4, command.getCorePoolSize());
+        assertEquals(16, command.getMaximumPoolSize());
+        assertEquals(30L, command.getKeepAliveSeconds());
+        assertTrue(command.getAllowCoreThreadTimeOut());
+        assertNull(command.getConcurrencyLimit());
+        assertEquals("trace-001", command.getTraceId());
+        assertEquals("request-001", command.getRequestId());
+        assertEquals("admin", command.getOperator());
     }
 
-    /**
-     * 测试 5：查询线程池配置 - 异常
-     */
     @Test
-    public void test_queryThreadPoolConfig_Exception() {
-        String cacheKey = "THREAD_POOL_CONFIG_PARAMETER_LIST_KEY_test-app_error";
-        when(mockRedissonClient.getBucket(anyString())).thenThrow(new RuntimeException("Redis 错误"));
+    public void shouldNotPublishInvalidResizeMessage() {
+        ResizeExecutorRequest request = new ResizeExecutorRequest();
+        request.setCorePoolSize(16);
+        request.setMaximumPoolSize(4);
 
-        Response<ThreadPoolConfigEntity> response = controller.queryThreadPoolConfig("test-app", "error");
+        Response<Boolean> response = controller.resizeExecutor("order-app", "order-8093", "orderExecutor", request);
 
-        assertEquals(Response.Code.UN_ERROR.getCode(), response.getCode());
+        assertEquals(Response.Code.ILLEGAL_PARAMETER.getCode(), response.getCode());
+        assertFalse(response.getData());
+        assertTrue(response.getInfo().contains("corePoolSize"));
+        verify(mockRedissonClient, never()).getTopic(anyString());
     }
 
-    /**
-     * 测试 6：更新线程池配置 - 成功
-     */
     @Test
-    public void test_updateThreadPoolConfig_Success() {
-        ThreadPoolConfigEntity request = new ThreadPoolConfigEntity("test-app", "threadPoolExecutor01");
-        request.setCorePoolSize(30);
-        request.setMaximumPoolSize(100);
+    public void shouldPublishVirtualLimitMessage() {
+        MDC.put("traceId", "trace-002");
+        MDC.put("requestId", "request-002");
+        VirtualLimitRequest request = new VirtualLimitRequest();
+        request.setConcurrencyLimit(200);
+        request.setOperator("ops");
+        when(mockRedissonClient.getTopic(DtpRedisKeys.changeTopic("order-app"))).thenReturn(mockRTopic);
 
-        String topicKey = "DYNAMIC_THREAD_POOL_REDIS_TOPIC_test-app";
-        when(mockRedissonClient.getTopic(anyString())).thenReturn(mockRTopic);
-        when(mockRTopic.publish(request)).thenReturn(1L);
-
-        Response<Boolean> response = controller.updateThreadPoolConfig(request);
+        Response<Boolean> response = controller.updateVirtualLimit("order-app", "order-8093", "virtualExecutor", request);
 
         assertEquals(Response.Code.SUCCESS.getCode(), response.getCode());
         assertTrue(response.getData());
-        verify(mockRTopic, times(1)).publish(request);
+        ArgumentCaptor<DtpConfigChangeMessage> captor = ArgumentCaptor.forClass(DtpConfigChangeMessage.class);
+        verify(mockRTopic).publish(captor.capture());
+        DtpConfigChangeMessage message = captor.getValue();
+        assertEquals(ExecutorKind.VIRTUAL_THREAD_PER_TASK, message.getExecutorKind());
+        assertEquals("virtualExecutor", message.getExecutorName());
+        assertEquals("ops", message.getOperator());
+        assertEquals(ExecutorKind.VIRTUAL_THREAD_PER_TASK, message.getPayload().getExecutorKind());
+        assertEquals(200, message.getPayload().getConcurrencyLimit());
+        assertNull(message.getPayload().getCorePoolSize());
+        assertNull(message.getPayload().getMaximumPoolSize());
+        assertEquals("trace-002", message.getPayload().getTraceId());
+        assertEquals("request-002", message.getPayload().getRequestId());
     }
 
-    /**
-     * 测试 7：更新线程池配置 - 异常
-     */
     @Test
-    public void test_updateThreadPoolConfig_Exception() {
-        ThreadPoolConfigEntity request = new ThreadPoolConfigEntity("test-app", "threadPoolExecutor01");
-        request.setCorePoolSize(30);
+    public void shouldNotPublishInvalidVirtualLimitMessage() {
+        VirtualLimitRequest request = new VirtualLimitRequest();
+        request.setConcurrencyLimit(0);
 
-        String topicKey = "DYNAMIC_THREAD_POOL_REDIS_TOPIC_test-app";
-        when(mockRedissonClient.getTopic(anyString())).thenThrow(new RuntimeException("Redis 发布失败"));
+        Response<Boolean> response = controller.updateVirtualLimit("order-app", "order-8093", "virtualExecutor", request);
 
-        Response<Boolean> response = controller.updateThreadPoolConfig(request);
-
-        assertEquals(Response.Code.UN_ERROR.getCode(), response.getCode());
+        assertEquals(Response.Code.ILLEGAL_PARAMETER.getCode(), response.getCode());
         assertFalse(response.getData());
+        assertTrue(response.getInfo().contains("concurrencyLimit"));
+        verify(mockRedissonClient, never()).getTopic(anyString());
     }
 
-    /**
-     * 测试 8：验证请求 JSON 序列化
-     */
     @Test
-    public void test_RequestJsonSerialization() {
-        ThreadPoolConfigEntity entity = new ThreadPoolConfigEntity("test-app", "threadPoolExecutor01");
-        entity.setCorePoolSize(20);
-        entity.setMaximumPoolSize(50);
+    public void shouldQueryEvents() {
+        DtpAuditEvent event = new DtpAuditEvent();
+        event.setAppName("order-app");
+        when(mockRedissonClient.<DtpAuditEvent>getList(DtpRedisKeys.event("order-app", "20260630"))).thenReturn(mockRList);
+        when(mockRList.readAll()).thenReturn(List.of(event));
 
-        String json = JSON.toJSONString(entity);
+        Response<List<DtpAuditEvent>> response = controller.queryEvents("order-app", "20260630");
 
-        assertNotNull(json);
-        assertTrue(json.contains("appName"));
-        assertTrue(json.contains("threadPoolName"));
-        assertTrue(json.contains("corePoolSize"));
-        assertTrue(json.contains("maximumPoolSize"));
+        assertEquals(Response.Code.SUCCESS.getCode(), response.getCode());
+        assertEquals(1, response.getData().size());
+        assertSame(event, response.getData().get(0));
     }
+
+    @Test
+    public void shouldReturnTraceIdFromMdc() {
+        MDC.put("traceId", "trace-response");
+        when(mockRedissonClient.<String>getSet(DtpRedisKeys.apps())).thenReturn(mockRSet);
+        when(mockRSet.readAll()).thenReturn(Set.of("order-app"));
+
+        Response<Set<String>> response = controller.queryApps();
+
+        assertEquals("trace-response", response.getTraceId());
+    }
+
+    @Test
+    public void shouldUseTraceHeadersAndClearMdc() throws ServletException, IOException {
+        DtpTraceIdFilter filter = new DtpTraceIdFilter();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(DtpTraceIdFilter.TRACE_ID_HEADER, "trace-header");
+        request.addHeader(DtpTraceIdFilter.REQUEST_ID_HEADER, "request-header");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain filterChain = new MockFilterChain(new HttpServlet() {
+            @Override
+            protected void service(HttpServletRequest request, HttpServletResponse response) {
+                assertEquals("trace-header", MDC.get(DtpTraceIdFilter.TRACE_ID));
+                assertEquals("request-header", MDC.get(DtpTraceIdFilter.REQUEST_ID));
+            }
+        });
+
+        filter.doFilter(request, response, filterChain);
+
+        assertEquals("trace-header", response.getHeader(DtpTraceIdFilter.TRACE_ID_HEADER));
+        assertNull(MDC.get(DtpTraceIdFilter.TRACE_ID));
+        assertNull(MDC.get(DtpTraceIdFilter.REQUEST_ID));
+    }
+
 }
