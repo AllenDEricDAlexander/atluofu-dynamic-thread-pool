@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ExecutorSnapshot;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ExecutorUpdateCommand;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.UpdateResult;
+import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.valobj.ExecutorKind;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.executor.ManagedExecutor;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.executor.ManagedExecutorRegistry;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.executor.adapter.ThreadPoolExecutorManagedExecutor;
@@ -123,6 +124,74 @@ public class DynamicThreadPoolServiceTest {
 
         assertFalse(result.isSuccess());
         assertEquals("executor not found: missingExecutor", result.getMessage());
+    }
+
+    @Test
+    public void test_updateExecutorRejectsMismatchedInstanceId() {
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                2, 8,
+                30L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(100)
+        );
+        ManagedExecutor managedExecutor = new ThreadPoolExecutorManagedExecutor(
+                "app", "instance", "orderExecutor", executor
+        );
+        DynamicThreadPoolService service = new DynamicThreadPoolService(
+                new ManagedExecutorRegistry(List.of(managedExecutor))
+        );
+        ExecutorUpdateCommand command = new ExecutorUpdateCommand();
+        command.setAppName("app");
+        command.setInstanceId("another-instance");
+        command.setExecutorName("orderExecutor");
+        command.setExecutorKind(ExecutorKind.PLATFORM_THREAD_POOL);
+        command.setCorePoolSize(3);
+        command.setMaximumPoolSize(9);
+
+        UpdateResult result = service.updateExecutor(command);
+
+        assertFalse(result.isSuccess());
+        assertEquals("instanceId mismatch: another-instance", result.getMessage());
+        assertEquals(2, executor.getCorePoolSize());
+        assertEquals(8, executor.getMaximumPoolSize());
+    }
+
+    @Test
+    public void test_updateExecutorRejectsMismatchedAppNameAndKind() {
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                2, 8,
+                30L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(100)
+        );
+        ManagedExecutor managedExecutor = new ThreadPoolExecutorManagedExecutor(
+                "app", "instance", "orderExecutor", executor
+        );
+        DynamicThreadPoolService service = new DynamicThreadPoolService(
+                new ManagedExecutorRegistry(List.of(managedExecutor))
+        );
+        ExecutorUpdateCommand wrongAppCommand = new ExecutorUpdateCommand();
+        wrongAppCommand.setAppName("another-app");
+        wrongAppCommand.setInstanceId("instance");
+        wrongAppCommand.setExecutorName("orderExecutor");
+        wrongAppCommand.setExecutorKind(ExecutorKind.PLATFORM_THREAD_POOL);
+        wrongAppCommand.setCorePoolSize(3);
+        wrongAppCommand.setMaximumPoolSize(9);
+        ExecutorUpdateCommand wrongKindCommand = new ExecutorUpdateCommand();
+        wrongKindCommand.setAppName("app");
+        wrongKindCommand.setInstanceId("instance");
+        wrongKindCommand.setExecutorName("orderExecutor");
+        wrongKindCommand.setExecutorKind(ExecutorKind.VIRTUAL_THREAD_PER_TASK);
+        wrongKindCommand.setCorePoolSize(3);
+        wrongKindCommand.setMaximumPoolSize(9);
+
+        UpdateResult wrongAppResult = service.updateExecutor(wrongAppCommand);
+        UpdateResult wrongKindResult = service.updateExecutor(wrongKindCommand);
+
+        assertFalse(wrongAppResult.isSuccess());
+        assertEquals("appName mismatch: another-app", wrongAppResult.getMessage());
+        assertFalse(wrongKindResult.isSuccess());
+        assertEquals("executorKind mismatch: VIRTUAL_THREAD_PER_TASK", wrongKindResult.getMessage());
+        assertEquals(2, executor.getCorePoolSize());
+        assertEquals(8, executor.getMaximumPoolSize());
     }
 
 }

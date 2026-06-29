@@ -38,6 +38,11 @@ public class ThreadPoolConfigAdjustListener implements MessageListener<DtpConfig
 
     @Override
     public void onMessage(CharSequence channel, DtpConfigChangeMessage message) {
+        if (message == null) {
+            logger.warn("动态线程池，收到空配置变更消息。频道:{}", channel);
+            MDC.clear();
+            return;
+        }
         try {
             MDC.put("traceId", message.getTraceId());
             MDC.put("requestId", message.getRequestId());

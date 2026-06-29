@@ -135,6 +135,15 @@ public class ThreadPoolConfigAdjustListenerTest {
         assertNull(MDC.get("requestId"));
     }
 
+    @Test
+    public void test_onMessage_ignoresNullMessage() {
+        listener.onMessage("test-channel", null);
+
+        verifyNoMoreInteractions(dynamicThreadPoolService, registry);
+        assertNull(MDC.get("traceId"));
+        assertNull(MDC.get("requestId"));
+    }
+
     private DtpConfigChangeMessage buildMessage() {
         ExecutorUpdateCommand command = new ExecutorUpdateCommand();
         command.setAppName("test-app");
