@@ -1,7 +1,7 @@
 package top.atluofu.middleware.dynamic.thread.pool.sdk.trigger.listener;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.IDynamicThreadPoolService;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
@@ -10,7 +10,7 @@ import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.IRegistry;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -26,7 +26,7 @@ public class ThreadPoolConfigAdjustListenerTest {
     private IRegistry mockRegistry;
     private ThreadPoolConfigAdjustListener listener;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         mockThreadPoolService = mock(IDynamicThreadPoolService.class);
         mockRegistry = mock(IRegistry.class);
@@ -57,8 +57,8 @@ public class ThreadPoolConfigAdjustListenerTest {
         verify(mockThreadPoolService, times(1)).updateThreadPoolConfig(captor.capture());
 
         ThreadPoolConfigEntity capturedConfig = captor.getValue();
-        assertEquals("核心线程数应该正确", 20, capturedConfig.getCorePoolSize());
-        assertEquals("最大线程数应该正确", 50, capturedConfig.getMaximumPoolSize());
+        assertEquals(20, capturedConfig.getCorePoolSize(), "核心线程数应该正确");
+        assertEquals(50, capturedConfig.getMaximumPoolSize(), "最大线程数应该正确");
     }
 
     /**
@@ -103,7 +103,7 @@ public class ThreadPoolConfigAdjustListenerTest {
         // 验证 updateThreadPoolConfig 被调用时使用的是 corePoolSize
         ArgumentCaptor<ThreadPoolConfigEntity> captor = ArgumentCaptor.forClass(ThreadPoolConfigEntity.class);
         verify(mockThreadPoolService).updateThreadPoolConfig(captor.capture());
-        assertEquals("应该使用 corePoolSize", 30, captor.getValue().getCorePoolSize());
+        assertEquals(30, captor.getValue().getCorePoolSize(), "应该使用 corePoolSize");
     }
 
     /**
@@ -134,7 +134,7 @@ public class ThreadPoolConfigAdjustListenerTest {
         verify(mockRegistry).reportThreadPoolConfigParameter(reportCaptor.capture());
 
         ThreadPoolConfigEntity reportedConfig = reportCaptor.getValue();
-        assertEquals("活跃线程数应该被上报", 5, reportedConfig.getActiveCount());
-        assertEquals("队列大小应该被上报", 10, reportedConfig.getQueueSize());
+        assertEquals(5, reportedConfig.getActiveCount(), "活跃线程数应该被上报");
+        assertEquals(10, reportedConfig.getQueueSize(), "队列大小应该被上报");
     }
 }

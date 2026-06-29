@@ -1,7 +1,7 @@
 package top.atluofu.middleware.dynamic.thread.pool.sdk.domain;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
 
 import java.util.HashMap;
@@ -12,7 +12,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * @ClassName: DynamicThreadPoolServiceTest
@@ -29,7 +29,7 @@ public class DynamicThreadPoolServiceTest {
 
     private Map<String, ThreadPoolExecutor> threadPoolExecutorMap;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         threadPoolExecutorMap = new HashMap<>();
         
@@ -61,8 +61,8 @@ public class DynamicThreadPoolServiceTest {
     public void test_queryThreadPoolList() {
         List<ThreadPoolConfigEntity> threadPoolList = dynamicThreadPoolService.queryThreadPoolList();
         
-        assertNotNull("线程池列表不应为空", threadPoolList);
-        assertEquals("应该返回 2 个线程池", 2, threadPoolList.size());
+        assertNotNull(threadPoolList, "线程池列表不应为空");
+        assertEquals(2, threadPoolList.size(), "应该返回 2 个线程池");
         
         // 验证线程池 1 的配置
         ThreadPoolConfigEntity entity1 = threadPoolList.stream()
@@ -70,11 +70,11 @@ public class DynamicThreadPoolServiceTest {
                 .findFirst()
                 .orElse(null);
         
-        assertNotNull("应该找到 threadPoolExecutor01", entity1);
-        assertEquals("应用名应该正确", applicationName, entity1.getAppName());
-        assertEquals("核心线程数应该为 10", 10, entity1.getCorePoolSize());
-        assertEquals("最大线程数应该为 50", 50, entity1.getMaximumPoolSize());
-        assertEquals("队列类型应该是 LinkedBlockingQueue", "LinkedBlockingQueue", entity1.getQueueType());
+        assertNotNull(entity1, "应该找到 threadPoolExecutor01");
+        assertEquals(applicationName, entity1.getAppName(), "应用名应该正确");
+        assertEquals(10, entity1.getCorePoolSize(), "核心线程数应该为 10");
+        assertEquals(50, entity1.getMaximumPoolSize(), "最大线程数应该为 50");
+        assertEquals("LinkedBlockingQueue", entity1.getQueueType(), "队列类型应该是 LinkedBlockingQueue");
         
         // 验证线程池 2 的配置
         ThreadPoolConfigEntity entity2 = threadPoolList.stream()
@@ -82,9 +82,9 @@ public class DynamicThreadPoolServiceTest {
                 .findFirst()
                 .orElse(null);
         
-        assertNotNull("应该找到 threadPoolExecutor02", entity2);
-        assertEquals("核心线程数应该为 20", 20, entity2.getCorePoolSize());
-        assertEquals("最大线程数应该为 80", 80, entity2.getMaximumPoolSize());
+        assertNotNull(entity2, "应该找到 threadPoolExecutor02");
+        assertEquals(20, entity2.getCorePoolSize(), "核心线程数应该为 20");
+        assertEquals(80, entity2.getMaximumPoolSize(), "最大线程数应该为 80");
     }
 
     /**
@@ -94,11 +94,11 @@ public class DynamicThreadPoolServiceTest {
     public void test_queryThreadPoolConfigByName() {
         ThreadPoolConfigEntity entity = dynamicThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01");
         
-        assertNotNull("查询结果不应为空", entity);
-        assertEquals("应用名应该正确", applicationName, entity.getAppName());
-        assertEquals("线程池名称应该正确", "threadPoolExecutor01", entity.getThreadPoolName());
-        assertEquals("核心线程数应该为 10", 10, entity.getCorePoolSize());
-        assertEquals("最大线程数应该为 50", 50, entity.getMaximumPoolSize());
+        assertNotNull(entity, "查询结果不应为空");
+        assertEquals(applicationName, entity.getAppName(), "应用名应该正确");
+        assertEquals("threadPoolExecutor01", entity.getThreadPoolName(), "线程池名称应该正确");
+        assertEquals(10, entity.getCorePoolSize(), "核心线程数应该为 10");
+        assertEquals(50, entity.getMaximumPoolSize(), "最大线程数应该为 50");
     }
 
     /**
@@ -108,11 +108,11 @@ public class DynamicThreadPoolServiceTest {
     public void test_queryNonExistentThreadPool() {
         ThreadPoolConfigEntity entity = dynamicThreadPoolService.queryThreadPoolConfigByName("nonExistentPool");
         
-        assertNotNull("即使线程池不存在，也应返回实体对象", entity);
-        assertEquals("应用名应该正确", applicationName, entity.getAppName());
-        assertEquals("线程池名称应该正确", "nonExistentPool", entity.getThreadPoolName());
-        assertEquals("核心线程数应该为 0", 0, entity.getCorePoolSize());
-        assertEquals("最大线程数应该为 0", 0, entity.getMaximumPoolSize());
+        assertNotNull(entity, "即使线程池不存在，也应返回实体对象");
+        assertEquals(applicationName, entity.getAppName(), "应用名应该正确");
+        assertEquals("nonExistentPool", entity.getThreadPoolName(), "线程池名称应该正确");
+        assertEquals(0, entity.getCorePoolSize(), "核心线程数应该为 0");
+        assertEquals(0, entity.getMaximumPoolSize(), "最大线程数应该为 0");
     }
 
     /**
@@ -122,8 +122,8 @@ public class DynamicThreadPoolServiceTest {
     public void test_updateThreadPoolConfig() {
         // 调整前的配置
         ThreadPoolConfigEntity beforeConfig = dynamicThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01");
-        assertEquals("调整前核心线程数应为 10", 10, beforeConfig.getCorePoolSize());
-        assertEquals("调整前最大线程数应为 50", 50, beforeConfig.getMaximumPoolSize());
+        assertEquals(10, beforeConfig.getCorePoolSize(), "调整前核心线程数应为 10");
+        assertEquals(50, beforeConfig.getMaximumPoolSize(), "调整前最大线程数应为 50");
 
         // 创建新的配置
         ThreadPoolConfigEntity newConfig = new ThreadPoolConfigEntity(applicationName, "threadPoolExecutor01");
@@ -135,8 +135,8 @@ public class DynamicThreadPoolServiceTest {
 
         // 验证调整后的配置
         ThreadPoolConfigEntity afterConfig = dynamicThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01");
-        assertEquals("调整后核心线程数应为 30", 30, afterConfig.getCorePoolSize());
-        assertEquals("调整后最大线程数应为 100", 100, afterConfig.getMaximumPoolSize());
+        assertEquals(30, afterConfig.getCorePoolSize(), "调整后核心线程数应为 30");
+        assertEquals(100, afterConfig.getMaximumPoolSize(), "调整后最大线程数应为 100");
     }
 
     /**
@@ -153,7 +153,7 @@ public class DynamicThreadPoolServiceTest {
         
         // 验证没有影响其他线程池
         ThreadPoolConfigEntity entity = dynamicThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01");
-        assertEquals("核心线程数应保持不变", 10, entity.getCorePoolSize());
+        assertEquals(10, entity.getCorePoolSize(), "核心线程数应保持不变");
     }
 
     /**
@@ -170,8 +170,8 @@ public class DynamicThreadPoolServiceTest {
 
         // 验证配置没有变化
         ThreadPoolConfigEntity entity = dynamicThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01");
-        assertEquals("核心线程数应保持不变", 10, entity.getCorePoolSize());
-        assertEquals("最大线程数应保持不变", 50, entity.getMaximumPoolSize());
+        assertEquals(10, entity.getCorePoolSize(), "核心线程数应保持不变");
+        assertEquals(50, entity.getMaximumPoolSize(), "最大线程数应保持不变");
     }
 
     /**
@@ -182,8 +182,8 @@ public class DynamicThreadPoolServiceTest {
         ThreadPoolConfigEntity entity = dynamicThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01");
         
         // 初始状态
-        assertEquals("初始活跃线程数应为 0", 0, entity.getActiveCount());
-        assertEquals("初始队列大小应为 0", 0, entity.getQueueSize());
+        assertEquals(0, entity.getActiveCount(), "初始活跃线程数应为 0");
+        assertEquals(0, entity.getQueueSize(), "初始队列大小应为 0");
         
         // 提交一些任务
         ThreadPoolExecutor executor = threadPoolExecutorMap.get("threadPoolExecutor01");
@@ -201,13 +201,13 @@ public class DynamicThreadPoolServiceTest {
         Thread.sleep(50);
         
         entity = dynamicThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01");
-        assertTrue("应该有活跃线程", entity.getActiveCount() > 0);
+        assertTrue(entity.getActiveCount() > 0, "应该有活跃线程");
         
         // 等待任务完成
         Thread.sleep(200);
         
         entity = dynamicThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01");
-        assertEquals("任务完成后活跃线程数应为 0", 0, entity.getActiveCount());
+        assertEquals(0, entity.getActiveCount(), "任务完成后活跃线程数应为 0");
     }
 
     /**
@@ -220,6 +220,6 @@ public class DynamicThreadPoolServiceTest {
         
         // 验证配置没有变化
         ThreadPoolConfigEntity entity = dynamicThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01");
-        assertEquals("核心线程数应保持不变", 10, entity.getCorePoolSize());
+        assertEquals(10, entity.getCorePoolSize(), "核心线程数应保持不变");
     }
 }

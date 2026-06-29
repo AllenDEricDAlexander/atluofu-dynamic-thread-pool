@@ -2,11 +2,9 @@ package top.atluofu.middleware.dynamic.thread.pool.smoke;
 
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
 import org.redisson.api.RTopic;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.junit4.SpringRunner;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.IDynamicThreadPoolService;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
 
@@ -14,7 +12,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * @ClassName: SmokeTest
@@ -24,7 +22,6 @@ import static org.junit.Assert.*;
  * @Version: 1.0
  */
 @Slf4j
-@RunWith(SpringRunner.class)
 @SpringBootTest
 public class SmokeTest {
 
@@ -42,13 +39,13 @@ public class SmokeTest {
         log.info("========== 冒烟测试 1：系统启动后基本功能验证 ==========");
         
         // 1. 验证服务可以注入
-        assertNotNull("ThreadPoolService 应该可以注入", dynamicThreadPoolService);
-        assertNotNull("RedisTopic 应该可以注入", dynamicThreadPoolRedisTopic);
+        assertNotNull(dynamicThreadPoolService, "ThreadPoolService 应该可以注入");
+        assertNotNull(dynamicThreadPoolRedisTopic, "RedisTopic 应该可以注入");
         
         // 2. 验证可以查询线程池列表
         List<ThreadPoolConfigEntity> threadPoolList = dynamicThreadPoolService.queryThreadPoolList();
-        assertNotNull("线程池列表不应为空", threadPoolList);
-        assertTrue("应该至少有一个线程池", threadPoolList.size() > 0);
+        assertNotNull(threadPoolList, "线程池列表不应为空");
+        assertTrue(threadPoolList.size() > 0, "应该至少有一个线程池");
         
         log.info("✓ 系统启动正常，基本功能可用");
     }
@@ -63,11 +60,11 @@ public class SmokeTest {
         // 查询存在的线程池
         ThreadPoolConfigEntity entity = dynamicThreadPoolService.queryThreadPoolConfigByName("threadPoolExecutor01");
         
-        assertNotNull("查询结果不应为空", entity);
-        assertNotNull("应用名不应为空", entity.getAppName());
-        assertNotNull("线程池名称不应为空", entity.getThreadPoolName());
-        assertTrue("核心线程数应该大于 0", entity.getCorePoolSize() > 0);
-        assertTrue("最大线程数应该大于 0", entity.getMaximumPoolSize() > 0);
+        assertNotNull(entity, "查询结果不应为空");
+        assertNotNull(entity.getAppName(), "应用名不应为空");
+        assertNotNull(entity.getThreadPoolName(), "线程池名称不应为空");
+        assertTrue(entity.getCorePoolSize() > 0, "核心线程数应该大于 0");
+        assertTrue(entity.getMaximumPoolSize() > 0, "最大线程数应该大于 0");
         
         log.info("查询结果 - 应用：{}, 线程池：{}, 核心：{}, 最大：{}", 
                 entity.getAppName(), entity.getThreadPoolName(), 
@@ -108,7 +105,7 @@ public class SmokeTest {
             ThreadPoolConfigEntity updatedConfig = dynamicThreadPoolService.queryThreadPoolConfigByName(threadPoolName);
             log.info("更新后配置 - 核心线程数：{}", updatedConfig.getCorePoolSize());
             
-            assertEquals("核心线程数应该被更新", newCoreSize, updatedConfig.getCorePoolSize());
+            assertEquals(newCoreSize, updatedConfig.getCorePoolSize(), "核心线程数应该被更新");
             
             log.info("✓ 动态调整功能正常");
             
@@ -144,7 +141,7 @@ public class SmokeTest {
         // 2. 验证可以查询到数据
         Thread.sleep(1000);
         List<ThreadPoolConfigEntity> threadPoolList = dynamicThreadPoolService.queryThreadPoolList();
-        assertNotNull("应该可以查询到线程池列表", threadPoolList);
+        assertNotNull(threadPoolList, "应该可以查询到线程池列表");
         
         log.info("✓ Redis 通信正常");
     }
@@ -160,20 +157,19 @@ public class SmokeTest {
         
         for (ThreadPoolConfigEntity entity : threadPoolList) {
             // 验证必填字段
-            assertNotNull("应用名不应为空", entity.getAppName());
-            assertNotNull("线程池名称不应为空", entity.getThreadPoolName());
+            assertNotNull(entity.getAppName(), "应用名不应为空");
+            assertNotNull(entity.getThreadPoolName(), "线程池名称不应为空");
             
             // 验证数值字段合理性
-            assertTrue("核心线程数应该大于 0", entity.getCorePoolSize() > 0);
-            assertTrue("最大线程数应该大于等于核心线程数", 
-                    entity.getMaximumPoolSize() >= entity.getCorePoolSize());
-            assertTrue("活跃线程数应该大于等于 0", entity.getActiveCount() >= 0);
-            assertTrue("池中线程数应该大于等于 0", entity.getPoolSize() >= 0);
-            assertTrue("队列任务数应该大于等于 0", entity.getQueueSize() >= 0);
-            assertTrue("剩余容量应该大于等于 0", entity.getRemainingCapacity() >= 0);
+            assertTrue(entity.getCorePoolSize() > 0, "核心线程数应该大于 0");
+            assertTrue(entity.getMaximumPoolSize() >= entity.getCorePoolSize(), "最大线程数应该大于等于核心线程数");
+            assertTrue(entity.getActiveCount() >= 0, "活跃线程数应该大于等于 0");
+            assertTrue(entity.getPoolSize() >= 0, "池中线程数应该大于等于 0");
+            assertTrue(entity.getQueueSize() >= 0, "队列任务数应该大于等于 0");
+            assertTrue(entity.getRemainingCapacity() >= 0, "剩余容量应该大于等于 0");
             
             // 验证队列类型
-            assertNotNull("队列类型不应为空", entity.getQueueType());
+            assertNotNull(entity.getQueueType(), "队列类型不应为空");
             
             log.info("线程池 {} 数据完整", entity.getThreadPoolName());
         }
@@ -190,7 +186,7 @@ public class SmokeTest {
         
         // 1. 查询不存在的线程池 - 不应抛出异常
         ThreadPoolConfigEntity nonExistent = dynamicThreadPoolService.queryThreadPoolConfigByName("nonExistentPool");
-        assertNotNull("即使线程池不存在，也应返回对象", nonExistent);
+        assertNotNull(nonExistent, "即使线程池不存在，也应返回对象");
         log.info("查询不存在的线程池 - 返回空对象，未抛出异常");
         
         // 2. 更新 null 配置 - 不应抛出异常
@@ -237,7 +233,7 @@ public class SmokeTest {
                 .findFirst()
                 .orElse(null);
         
-        assertNotNull("应该找到线程池", config2);
+        assertNotNull(config2, "应该找到线程池");
         log.info("步骤 3 - 验证配置：核心={}", config2.getCorePoolSize());
         
         // 5. 恢复原始配置

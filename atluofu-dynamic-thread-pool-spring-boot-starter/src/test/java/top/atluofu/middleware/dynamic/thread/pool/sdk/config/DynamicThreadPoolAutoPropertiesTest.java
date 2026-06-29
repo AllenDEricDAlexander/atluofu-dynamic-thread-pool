@@ -1,8 +1,8 @@
 package top.atluofu.middleware.dynamic.thread.pool.sdk.config;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * @description DynamicThreadPoolAutoProperties 简单属性测试

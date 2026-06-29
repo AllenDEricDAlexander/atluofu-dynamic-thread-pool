@@ -1,13 +1,11 @@
 package top.atluofu.middleware.dynamic.thread.pool.trigger;
 
 import com.alibaba.fastjson2.JSON;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.redisson.api.RBucket;
 import org.redisson.api.RList;
 import org.redisson.api.RTopic;
@@ -18,7 +16,7 @@ import top.atluofu.middleware.dynamic.thread.pool.types.Response;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -29,7 +27,7 @@ import static org.mockito.Mockito.*;
  * @datetime: 2026Year-03Month-31Day
  * @Version: 1.0
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class DynamicThreadPoolControllerTest {
 
     @Mock
@@ -46,11 +44,6 @@ public class DynamicThreadPoolControllerTest {
 
     @InjectMocks
     private DynamicThreadPoolController controller;
-
-    @Before
-    public void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
 
     /**
      * 测试 1：查询线程池列表 - 成功

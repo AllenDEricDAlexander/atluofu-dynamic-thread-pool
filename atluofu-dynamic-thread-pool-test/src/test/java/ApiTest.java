@@ -1,10 +1,8 @@
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
 import org.redisson.api.RTopic;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.junit4.SpringRunner;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
 
 /**
@@ -15,7 +13,6 @@ import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.Thread
  * @Version: 1.0
  */
 @Slf4j
-@RunWith(SpringRunner.class)
 @SpringBootTest
 public class ApiTest {
 

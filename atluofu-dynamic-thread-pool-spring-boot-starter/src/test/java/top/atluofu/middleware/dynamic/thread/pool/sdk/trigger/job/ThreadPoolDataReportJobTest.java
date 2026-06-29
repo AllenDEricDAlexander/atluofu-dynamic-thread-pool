@@ -1,6 +1,6 @@
 package top.atluofu.middleware.dynamic.thread.pool.sdk.trigger.job;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.IDynamicThreadPoolService;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.registry.IRegistry;

@@ -1,6 +1,6 @@
 package top.atluofu.middleware.dynamic.thread.pool.sdk.registry.redis;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.redisson.api.RBucket;
 import org.redisson.api.RList;
 import org.redisson.api.RedissonClient;

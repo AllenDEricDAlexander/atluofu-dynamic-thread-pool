@@ -12,10 +12,11 @@ import org.redisson.api.RTopic;
 import org.redisson.api.RedissonClient;
 import org.redisson.codec.JsonJacksonCodec;
 import org.redisson.config.Config;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.DynamicThreadPoolService;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.IDynamicThreadPoolService;
@@ -37,8 +38,9 @@ import java.util.concurrent.ThreadPoolExecutor;
  * @datetime: 2025Year-01Month-05Day-21:14
  * @Version: 1.0
  */
-@Configuration
+@AutoConfiguration
 @EnableConfigurationProperties(DynamicThreadPoolAutoProperties.class)
+@ConditionalOnProperty(prefix = "atluofu.dynamic.thread-pool", name = "enabled", havingValue = "true", matchIfMissing = true)
 @Slf4j
 public class DynamicThreadPoolAutoConfig {
 

@@ -2,11 +2,9 @@ package top.atluofu.middleware.dynamic.thread.pool.integration;
 
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
 import org.redisson.api.RTopic;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.junit4.SpringRunner;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.IDynamicThreadPoolService;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.domain.model.entity.ThreadPoolConfigEntity;
 
@@ -14,7 +12,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * @ClassName: ThreadPoolIntegrationTest
@@ -24,7 +22,6 @@ import static org.junit.Assert.*;
  * @Version: 1.0
  */
 @Slf4j
-@RunWith(SpringRunner.class)
 @SpringBootTest
 public class ThreadPoolIntegrationTest {
 
@@ -43,7 +40,7 @@ public class ThreadPoolIntegrationTest {
         
         List<ThreadPoolConfigEntity> threadPoolList = dynamicThreadPoolService.queryThreadPoolList();
         
-        assertNotNull("线程池列表不应为空", threadPoolList);
+        assertNotNull(threadPoolList, "线程池列表不应为空");
         log.info("查询到 {} 个线程池", threadPoolList.size());
         
         for (ThreadPoolConfigEntity entity : threadPoolList) {
@@ -54,10 +51,10 @@ public class ThreadPoolIntegrationTest {
                     entity.getActiveCount(),
                     entity.getQueueSize());
             
-            assertNotNull("应用名不应为空", entity.getAppName());
-            assertNotNull("线程池名称不应为空", entity.getThreadPoolName());
-            assertTrue("核心线程数应该大于 0", entity.getCorePoolSize() > 0);
-            assertTrue("最大线程数应该大于 0", entity.getMaximumPoolSize() > 0);
+            assertNotNull(entity.getAppName(), "应用名不应为空");
+            assertNotNull(entity.getThreadPoolName(), "线程池名称不应为空");
+            assertTrue(entity.getCorePoolSize() > 0, "核心线程数应该大于 0");
+            assertTrue(entity.getMaximumPoolSize() > 0, "最大线程数应该大于 0");
         }
     }
 
@@ -98,8 +95,8 @@ public class ThreadPoolIntegrationTest {
             log.info("调整后 - 核心线程数：{}, 最大线程数：{}", 
                     afterConfig.getCorePoolSize(), afterConfig.getMaximumPoolSize());
             
-            assertEquals("核心线程数应该被调整", originalCoreSize + 5, afterConfig.getCorePoolSize());
-            assertEquals("最大线程数应该被调整", originalMaxSize + 10, afterConfig.getMaximumPoolSize());
+            assertEquals(originalCoreSize + 5, afterConfig.getCorePoolSize(), "核心线程数应该被调整");
+            assertEquals(originalMaxSize + 10, afterConfig.getMaximumPoolSize(), "最大线程数应该被调整");
             
             log.info("✓ 动态调整成功！");
             
@@ -133,10 +130,10 @@ public class ThreadPoolIntegrationTest {
                 initialConfig.getRemainingCapacity());
         
         // 验证状态字段
-        assertTrue("活跃线程数应该大于等于 0", initialConfig.getActiveCount() >= 0);
-        assertTrue("队列任务数应该大于等于 0", initialConfig.getQueueSize() >= 0);
-        assertTrue("剩余容量应该大于等于 0", initialConfig.getRemainingCapacity() >= 0);
-        assertNotNull("队列类型不应为空", initialConfig.getQueueType());
+        assertTrue(initialConfig.getActiveCount() >= 0, "活跃线程数应该大于等于 0");
+        assertTrue(initialConfig.getQueueSize() >= 0, "队列任务数应该大于等于 0");
+        assertTrue(initialConfig.getRemainingCapacity() >= 0, "剩余容量应该大于等于 0");
+        assertNotNull(initialConfig.getQueueType(), "队列类型不应为空");
         
         log.info("✓ 状态监控正常！");
     }
@@ -175,8 +172,8 @@ public class ThreadPoolIntegrationTest {
             log.info("更新后配置 - 核心：{}, 最大：{}", 
                     updatedConfig.getCorePoolSize(), updatedConfig.getMaximumPoolSize());
             
-            assertEquals("核心线程数应该被更新", 25, updatedConfig.getCorePoolSize());
-            assertEquals("最大线程数应该被更新", 75, updatedConfig.getMaximumPoolSize());
+            assertEquals(25, updatedConfig.getCorePoolSize(), "核心线程数应该被更新");
+            assertEquals(75, updatedConfig.getMaximumPoolSize(), "最大线程数应该被更新");
             
             log.info("✓ 监听器工作正常！");
             
@@ -228,7 +225,7 @@ public class ThreadPoolIntegrationTest {
         log.info("最终配置 - 核心：{}, 最大：{}", 
                 finalConfig.getCorePoolSize(), finalConfig.getMaximumPoolSize());
         
-        assertNotNull("最终配置不应为空", finalConfig);
+        assertNotNull(finalConfig, "最终配置不应为空");
         log.info("✓ 并发更新处理完成！");
     }
 }

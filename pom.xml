@@ -19,13 +19,12 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.1.5</version>
+        <version>3.5.16</version>
     </parent>
 
     <properties>
-
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <java.version>21</java.version>
+        <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -50,12 +49,6 @@
                 <groupId>com.alibaba.fastjson2</groupId>
                 <artifactId>fastjson2</artifactId>
                 <version>2.0.53</version>
-            </dependency>
-            <dependency>
-                <groupId>junit</groupId>
-                <artifactId>junit</artifactId>
-                <version>4.13.2</version>
-                <scope>test</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -90,10 +83,8 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.0</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <release>${maven.compiler.release}</release>
                     <encoding>${project.build.sourceEncoding}</encoding>
                 </configuration>
             </plugin>
@@ -120,11 +111,9 @@
                 <activeByDefault>true</activeByDefault>
             </activation>
             <properties>
-                <java_jvm>-Xms1G -Xmx1G -server -XX:MaxPermSize=256M -Xss256K -Dspring.profiles.active=test
-                    -XX:+DisableExplicitGC -XX:+UseG1GC -XX:LargePageSizeInBytes=128m -XX:+UseFastAccessorMethods
+                <java_jvm>-Xms1G -Xmx1G -server -Xss256K -Dspring.profiles.active=test
+                    -XX:+DisableExplicitGC -XX:+UseG1GC -XX:LargePageSizeInBytes=128m
                     -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/export/Logs/xfg-frame-archetype-lite-boot
-                    -Xloggc:/export/Logs/xfg-frame-archetype-lite-boot/gc-xfg-frame-archetype-lite-boot.log
-                    -XX:+PrintGCDetails -XX:+PrintGCDateStamps
                 </java_jvm>
                 <profileActive>dev</profileActive>
             </properties>
@@ -132,11 +121,9 @@
         <profile>
             <id>test</id>
             <properties>
-                <java_jvm>-Xms1G -Xmx1G -server -XX:MaxPermSize=256M -Xss256K -Dspring.profiles.active=test
-                    -XX:+DisableExplicitGC -XX:+UseG1GC -XX:LargePageSizeInBytes=128m -XX:+UseFastAccessorMethods
+                <java_jvm>-Xms1G -Xmx1G -server -Xss256K -Dspring.profiles.active=test
+                    -XX:+DisableExplicitGC -XX:+UseG1GC -XX:LargePageSizeInBytes=128m
                     -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/export/Logs/xfg-frame-archetype-lite-boot
-                    -Xloggc:/export/Logs/xfg-frame-archetype-lite-boot/gc-xfg-frame-archetype-lite-boot.log
-                    -XX:+PrintGCDetails -XX:+PrintGCDateStamps
                 </java_jvm>
                 <profileActive>test</profileActive>
             </properties>
@@ -144,11 +131,9 @@
         <profile>
             <id>prod</id>
             <properties>
-                <java_jvm>-Xms6G -Xmx6G -server -XX:MaxPermSize=256M -Xss256K -Dspring.profiles.active=release
-                    -XX:+DisableExplicitGC -XX:+UseG1GC -XX:LargePageSizeInBytes=128m -XX:+UseFastAccessorMethods
+                <java_jvm>-Xms6G -Xmx6G -server -Xss256K -Dspring.profiles.active=release
+                    -XX:+DisableExplicitGC -XX:+UseG1GC -XX:LargePageSizeInBytes=128m
                     -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/export/Logs/fq-mall-activity-app
-                    -Xloggc:/export/Logs/xfg-frame-archetype-lite-boot/gc-xfg-frame-archetype-lite-boot.log
-                    -XX:+PrintGCDetails -XX:+PrintGCDateStamps
                 </java_jvm>
                 <profileActive>prod</profileActive>
             </properties>
