@@ -163,4 +163,53 @@ public class ThreadPoolExecutorManagedExecutorTest {
         assertFalse(executor.allowsCoreThreadTimeOut());
     }
 
+    @Test
+    public void test_updateRejectsZeroKeepAliveWhenCoreTimeoutAlreadyEnabledBeforeResize() {
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                5, 10,
+                60L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(100)
+        );
+        executor.allowCoreThreadTimeOut(true);
+        ThreadPoolExecutorManagedExecutor managedExecutor = new ThreadPoolExecutorManagedExecutor(
+                "test-app", "instance-01", "testExecutor", executor
+        );
+        ExecutorUpdateCommand command = new ExecutorUpdateCommand();
+        command.setCorePoolSize(12);
+        command.setMaximumPoolSize(15);
+        command.setKeepAliveSeconds(0L);
+
+        UpdateResult result = managedExecutor.update(command);
+
+        assertFalse(result.isSuccess());
+        assertEquals("keepAliveSeconds must be > 0 when allowCoreThreadTimeOut is true", result.getMessage());
+        assertEquals(5, executor.getCorePoolSize());
+        assertEquals(10, executor.getMaximumPoolSize());
+        assertEquals(60L, executor.getKeepAliveTime(TimeUnit.SECONDS));
+        assertTrue(executor.allowsCoreThreadTimeOut());
+    }
+
+    @Test
+    public void test_updateDisablesCoreThreadTimeoutBeforeSettingZeroKeepAlive() {
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                5, 10,
+                60L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(100)
+        );
+        executor.allowCoreThreadTimeOut(true);
+        ThreadPoolExecutorManagedExecutor managedExecutor = new ThreadPoolExecutorManagedExecutor(
+                "test-app", "instance-01", "testExecutor", executor
+        );
+        ExecutorUpdateCommand command = new ExecutorUpdateCommand();
+        command.setKeepAliveSeconds(0L);
+        command.setAllowCoreThreadTimeOut(false);
+
+        UpdateResult result = managedExecutor.update(command);
+
+        assertTrue(result.isSuccess());
+        assertEquals("success", result.getMessage());
+        assertEquals(0L, executor.getKeepAliveTime(TimeUnit.SECONDS));
+        assertFalse(executor.allowsCoreThreadTimeOut());
+    }
+
 }

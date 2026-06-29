@@ -93,11 +93,14 @@ public class ThreadPoolExecutorManagedExecutor implements ManagedExecutor {
             if (command.getCorePoolSize() != null && command.getMaximumPoolSize() != null) {
                 ThreadPoolResizeSupport.resize(executor, command.getCorePoolSize(), command.getMaximumPoolSize());
             }
+            if (Boolean.FALSE.equals(command.getAllowCoreThreadTimeOut())) {
+                executor.allowCoreThreadTimeOut(false);
+            }
             if (command.getKeepAliveSeconds() != null) {
                 executor.setKeepAliveTime(command.getKeepAliveSeconds(), TimeUnit.SECONDS);
             }
-            if (command.getAllowCoreThreadTimeOut() != null) {
-                executor.allowCoreThreadTimeOut(command.getAllowCoreThreadTimeOut());
+            if (Boolean.TRUE.equals(command.getAllowCoreThreadTimeOut())) {
+                executor.allowCoreThreadTimeOut(true);
             }
             result.setSuccess(true);
             result.setMessage("success");
@@ -123,16 +126,17 @@ public class ThreadPoolExecutorManagedExecutor implements ManagedExecutor {
                 return "corePoolSize must <= maximumPoolSize";
             }
         }
-        if (command.getKeepAliveSeconds() != null && command.getKeepAliveSeconds() < 0) {
+        boolean targetAllowCoreThreadTimeOut = command.getAllowCoreThreadTimeOut() != null
+                ? command.getAllowCoreThreadTimeOut()
+                : executor.allowsCoreThreadTimeOut();
+        long targetKeepAliveSeconds = command.getKeepAliveSeconds() != null
+                ? command.getKeepAliveSeconds()
+                : executor.getKeepAliveTime(TimeUnit.SECONDS);
+        if (targetKeepAliveSeconds < 0) {
             return "keepAliveSeconds must be >= 0";
         }
-        if (Boolean.TRUE.equals(command.getAllowCoreThreadTimeOut())) {
-            long keepAliveSeconds = command.getKeepAliveSeconds() != null
-                    ? command.getKeepAliveSeconds()
-                    : executor.getKeepAliveTime(TimeUnit.SECONDS);
-            if (keepAliveSeconds <= 0) {
-                return "keepAliveSeconds must be > 0 when allowCoreThreadTimeOut is true";
-            }
+        if (targetAllowCoreThreadTimeOut && targetKeepAliveSeconds <= 0) {
+            return "keepAliveSeconds must be > 0 when allowCoreThreadTimeOut is true";
         }
         return null;
     }
