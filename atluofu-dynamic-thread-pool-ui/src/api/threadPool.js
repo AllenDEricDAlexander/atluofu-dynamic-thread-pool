@@ -1,32 +1,62 @@
 import request from '@/utils/request'
 
 /**
- * 查询线程池列表
+ * 查询应用列表
  */
-export function queryThreadPoolList() {
+export function queryApps() {
   return request({
-    url: '/query_thread_pool_list',
+    url: '/apps',
     method: 'get'
   })
 }
 
 /**
- * 查询线程池配置
+ * 查询应用实例列表
  */
-export function queryThreadPoolConfig(params) {
+export function queryInstances(appName) {
   return request({
-    url: '/query_thread_pool_config',
-    method: 'get',
-    params
+    url: `/apps/${appName}/instances`,
+    method: 'get'
   })
 }
 
 /**
- * 更新线程池配置
+ * 查询执行器列表
  */
-export function updateThreadPoolConfig(data) {
+export function queryExecutors(appName, instanceId) {
   return request({
-    url: '/update_thread_pool_config',
+    url: `/apps/${appName}/instances/${instanceId}/executors`,
+    method: 'get'
+  })
+}
+
+/**
+ * 查询执行器配置
+ */
+export function queryExecutor(appName, instanceId, executorName) {
+  return request({
+    url: `/apps/${appName}/instances/${instanceId}/executors/${executorName}`,
+    method: 'get'
+  })
+}
+
+/**
+ * 调整传统线程池配置
+ */
+export function resizeExecutor(appName, instanceId, executorName, data) {
+  return request({
+    url: `/apps/${appName}/instances/${instanceId}/executors/${executorName}/resize`,
+    method: 'post',
+    data
+  })
+}
+
+/**
+ * 调整虚拟线程执行器并发限制
+ */
+export function updateVirtualLimit(appName, instanceId, executorName, data) {
+  return request({
+    url: `/apps/${appName}/instances/${instanceId}/executors/${executorName}/virtual-limit`,
     method: 'post',
     data
   })

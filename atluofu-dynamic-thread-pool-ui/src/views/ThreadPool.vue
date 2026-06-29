@@ -41,30 +41,38 @@
           v-loading="loading"
           style="width: 100%"
           :header-cell-style="{ background: '#f5f7fa', color: '#606266' }"
-          row-key="threadPoolName"
+          row-key="rowKey"
           border
         >
-          <el-table-column prop="appName" label="应用名称" :resizable="true" :min-width="100" />
-          <el-table-column prop="threadPoolName" label="线程池名称" :resizable="true" :min-width="100" />
-          <el-table-column prop="corePoolSize" label="核心线程数" :resizable="true" :min-width="80" align="center" />
-          <el-table-column prop="maximumPoolSize" label="最大线程数" :resizable="true" :min-width="80" align="center" />
+          <el-table-column prop="appName" label="应用名称" :resizable="true" :min-width="100" :formatter="formatColumnValue" />
+          <el-table-column prop="instanceId" label="实例 ID" :resizable="true" :min-width="120" :formatter="formatColumnValue" />
+          <el-table-column prop="executorName" label="执行器名称" :resizable="true" :min-width="120" :formatter="formatColumnValue" />
+          <el-table-column prop="executorKind" label="执行器类型" :resizable="true" :min-width="160" :formatter="formatColumnValue" />
+          <el-table-column prop="corePoolSize" label="核心线程数" :resizable="true" :min-width="90" align="center" :formatter="formatColumnValue" />
+          <el-table-column prop="maximumPoolSize" label="最大线程数" :resizable="true" :min-width="90" align="center" :formatter="formatColumnValue" />
           <el-table-column prop="activeCount" label="活跃线程数" :resizable="true" :min-width="80" align="center">
             <template #default="{ row }">
               <el-tag :type="getActiveType(row.activeCount, row.maximumPoolSize)">
-                {{ row.activeCount }}
+                {{ formatValue(row.activeCount) }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="poolSize" label="当前池中线程数" :resizable="true" :min-width="90" align="center" />
-          <el-table-column prop="queueType" label="队列类型" :resizable="true" :min-width="100" />
+          <el-table-column prop="poolSize" label="当前池中线程数" :resizable="true" :min-width="110" align="center" :formatter="formatColumnValue" />
           <el-table-column prop="queueSize" label="队列任务数" :resizable="true" :min-width="80" align="center">
             <template #default="{ row }">
               <el-tag :type="getQueueType(row.queueSize, row.remainingCapacity)">
-                {{ row.queueSize }}
+                {{ formatValue(row.queueSize) }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="remainingCapacity" label="队列剩余容量" :resizable="true" :min-width="90" align="center" />
+          <el-table-column prop="remainingCapacity" label="队列剩余容量" :resizable="true" :min-width="110" align="center" :formatter="formatColumnValue" />
+          <el-table-column prop="concurrencyLimit" label="并发限制" :resizable="true" :min-width="90" align="center" :formatter="formatColumnValue" />
+          <el-table-column prop="runningTasks" label="运行任务数" :resizable="true" :min-width="90" align="center" :formatter="formatColumnValue" />
+          <el-table-column prop="submittedTasks" label="提交任务数" :resizable="true" :min-width="90" align="center" :formatter="formatColumnValue" />
+          <el-table-column prop="completedTasks" label="完成任务数" :resizable="true" :min-width="90" align="center" :formatter="formatColumnValue" />
+          <el-table-column prop="failedTasks" label="失败任务数" :resizable="true" :min-width="90" align="center" :formatter="formatColumnValue" />
+          <el-table-column prop="rejectedTasks" label="拒绝任务数" :resizable="true" :min-width="90" align="center" :formatter="formatColumnValue" />
+          <el-table-column prop="availablePermits" label="可用许可数" :resizable="true" :min-width="90" align="center" :formatter="formatColumnValue" />
           <el-table-column label="操作" :resizable="true" :min-width="80" align="center" fixed="right">
             <template #default="{ row }">
               <el-button
@@ -92,10 +100,16 @@
         <el-form-item label="应用名称">
           <el-input v-model="editForm.appName" disabled />
         </el-form-item>
-        <el-form-item label="线程池名称">
-          <el-input v-model="editForm.threadPoolName" disabled />
+        <el-form-item label="实例 ID">
+          <el-input v-model="editForm.instanceId" disabled />
         </el-form-item>
-        <el-form-item label="核心线程数">
+        <el-form-item label="执行器名称">
+          <el-input v-model="editForm.executorName" disabled />
+        </el-form-item>
+        <el-form-item label="执行器类型">
+          <el-input v-model="editForm.executorKind" disabled />
+        </el-form-item>
+        <el-form-item v-if="!isVirtualExecutor(editForm)" label="核心线程数">
           <el-input-number 
             v-model="editForm.corePoolSize" 
             :min="1" 
@@ -103,7 +117,7 @@
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item label="最大线程数">
+        <el-form-item v-if="!isVirtualExecutor(editForm)" label="最大线程数">
           <el-input-number 
             v-model="editForm.maximumPoolSize" 
             :min="editForm.corePoolSize" 
@@ -111,11 +125,31 @@
             style="width: 100%"
           />
         </el-form-item>
+        <el-form-item v-if="!isVirtualExecutor(editForm)" label="存活秒数">
+          <el-input-number
+            v-model="editForm.keepAliveSeconds"
+            :min="0"
+            :max="86400"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item v-if="!isVirtualExecutor(editForm)" label="核心超时">
+          <el-switch v-model="editForm.allowCoreThreadTimeOut" />
+        </el-form-item>
+        <el-form-item v-if="isVirtualExecutor(editForm)" label="并发限制">
+          <el-input-number
+            v-model="editForm.concurrencyLimit"
+            :min="1"
+            :max="1000000"
+            style="width: 100%"
+          />
+        </el-form-item>
         <el-form-item label="当前状态">
           <div class="status-info">
-            <el-tag type="info">活跃线程：{{ editForm.activeCount }}</el-tag>
-            <el-tag type="warning" style="margin-left: 10px">队列任务：{{ editForm.queueSize }}</el-tag>
-            <el-tag type="success" style="margin-left: 10px">剩余容量：{{ editForm.remainingCapacity }}</el-tag>
+            <el-tag type="info">活跃线程：{{ formatValue(editForm.activeCount) }}</el-tag>
+            <el-tag type="warning">队列任务：{{ formatValue(editForm.queueSize) }}</el-tag>
+            <el-tag type="success">剩余容量：{{ formatValue(editForm.remainingCapacity) }}</el-tag>
+            <el-tag type="primary">运行任务：{{ formatValue(editForm.runningTasks) }}</el-tag>
           </div>
         </el-form-item>
       </el-form>
@@ -132,7 +166,14 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { queryThreadPoolList, queryThreadPoolConfig, updateThreadPoolConfig } from '@/api/threadPool'
+import {
+  queryApps,
+  queryInstances,
+  queryExecutors,
+  queryExecutor,
+  resizeExecutor,
+  updateVirtualLimit
+} from '@/api/threadPool'
 
 // 数据
 const threadPoolList = ref([])
@@ -145,16 +186,35 @@ const updating = ref(false)
 
 const editForm = ref({
   appName: '',
-  threadPoolName: '',
-  corePoolSize: 0,
-  maximumPoolSize: 0,
-  activeCount: 0,
-  queueSize: 0,
-  remainingCapacity: 0
+  instanceId: '',
+  executorName: '',
+  executorKind: '',
+  corePoolSize: null,
+  maximumPoolSize: null,
+  keepAliveSeconds: 0,
+  allowCoreThreadTimeOut: false,
+  activeCount: null,
+  poolSize: null,
+  queueSize: null,
+  remainingCapacity: null,
+  concurrencyLimit: null,
+  runningTasks: null,
+  submittedTasks: null,
+  completedTasks: null,
+  failedTasks: null,
+  rejectedTasks: null,
+  availablePermits: null
 })
+
+const formatValue = value => value === null || value === undefined ? '-' : value
+
+const formatColumnValue = (row, column, cellValue) => formatValue(cellValue)
+
+const isVirtualExecutor = row => row.executorKind === 'VIRTUAL_THREAD_PER_TASK'
 
 // 获取活跃线程类型
 const getActiveType = (activeCount, maximumPoolSize) => {
+  if (activeCount === null || activeCount === undefined || !maximumPoolSize) return 'info'
   const rate = activeCount / maximumPoolSize
   if (rate >= 0.8) return 'danger'
   if (rate >= 0.5) return 'warning'
@@ -163,6 +223,7 @@ const getActiveType = (activeCount, maximumPoolSize) => {
 
 // 获取队列类型
 const getQueueType = (queueSize, remainingCapacity) => {
+  if (queueSize === null || queueSize === undefined || remainingCapacity === null || remainingCapacity === undefined) return 'info'
   const total = queueSize + remainingCapacity
   const rate = total > 0 ? queueSize / total : 0
   if (rate >= 0.8) return 'danger'
@@ -170,12 +231,44 @@ const getQueueType = (queueSize, remainingCapacity) => {
   return 'success'
 }
 
+const getList = data => Array.isArray(data) ? data : []
+
+const getIdentityValue = (item, keys) => {
+  if (typeof item === 'string') return item
+  for (const key of keys) {
+    if (item && item[key] !== null && item[key] !== undefined) return item[key]
+  }
+  return ''
+}
+
+const normalizeExecutor = (executor, appName, instanceId) => ({
+  ...executor,
+  appName: executor.appName || appName,
+  instanceId: executor.instanceId || instanceId,
+  executorName: executor.executorName,
+  completedTasks: executor.completedTasks ?? executor.completedTaskCount,
+  rowKey: `${executor.appName || appName}:${executor.instanceId || instanceId}:${executor.executorName}`
+})
+
 // 获取数据
 const fetchData = async () => {
   loading.value = true
   try {
-    const res = await queryThreadPoolList()
-    threadPoolList.value = res.data || []
+    const appsRes = await queryApps()
+    const apps = getList(appsRes.data)
+    const instanceGroups = await Promise.all(apps.map(async app => {
+      const appName = getIdentityValue(app, ['appName', 'name'])
+      if (!appName) return []
+      const instancesRes = await queryInstances(appName)
+      const instances = getList(instancesRes.data)
+      return Promise.all(instances.map(async instance => {
+        const instanceId = getIdentityValue(instance, ['instanceId', 'id'])
+        if (!instanceId) return []
+        const executorsRes = await queryExecutors(appName, instanceId)
+        return getList(executorsRes.data).map(executor => normalizeExecutor(executor, appName, instanceId))
+      }))
+    }))
+    threadPoolList.value = instanceGroups.flat(2)
     total.value = threadPoolList.value.length
   } catch (error) {
     console.error('获取数据失败', error)
@@ -216,22 +309,31 @@ const stopAutoRefresh = () => {
 // 打开编辑对话框
 const openEditDialog = async (row) => {
   try {
-    const res = await queryThreadPoolConfig({
-      appName: row.appName,
-      threadPoolName: row.threadPoolName
-    })
+    const res = await queryExecutor(row.appName, row.instanceId, row.executorName)
     
     // 如果查询返回 null，使用列表中的数据
     const data = res.data || row
     
     editForm.value = {
       appName: data.appName || row.appName,
-      threadPoolName: data.threadPoolName || row.threadPoolName,
-      corePoolSize: data.corePoolSize || row.corePoolSize,
-      maximumPoolSize: data.maximumPoolSize || row.maximumPoolSize,
-      activeCount: data.activeCount || row.activeCount,
-      queueSize: data.queueSize || row.queueSize,
-      remainingCapacity: data.remainingCapacity || row.remainingCapacity
+      instanceId: data.instanceId || row.instanceId,
+      executorName: data.executorName || row.executorName,
+      executorKind: data.executorKind || row.executorKind,
+      corePoolSize: data.corePoolSize ?? row.corePoolSize ?? null,
+      maximumPoolSize: data.maximumPoolSize ?? row.maximumPoolSize ?? null,
+      keepAliveSeconds: data.keepAliveSeconds ?? row.keepAliveSeconds ?? 0,
+      allowCoreThreadTimeOut: data.allowCoreThreadTimeOut ?? row.allowCoreThreadTimeOut ?? false,
+      activeCount: data.activeCount ?? row.activeCount ?? null,
+      poolSize: data.poolSize ?? row.poolSize ?? null,
+      queueSize: data.queueSize ?? row.queueSize ?? null,
+      remainingCapacity: data.remainingCapacity ?? row.remainingCapacity ?? null,
+      concurrencyLimit: data.concurrencyLimit ?? row.concurrencyLimit ?? null,
+      runningTasks: data.runningTasks ?? row.runningTasks ?? null,
+      submittedTasks: data.submittedTasks ?? row.submittedTasks ?? null,
+      completedTasks: data.completedTasks ?? row.completedTasks ?? null,
+      failedTasks: data.failedTasks ?? row.failedTasks ?? null,
+      rejectedTasks: data.rejectedTasks ?? row.rejectedTasks ?? null,
+      availablePermits: data.availablePermits ?? row.availablePermits ?? null
     }
     editDialogVisible.value = true
   } catch (error) {
@@ -244,12 +346,20 @@ const openEditDialog = async (row) => {
 const handleUpdate = async () => {
   updating.value = true
   try {
-    await updateThreadPoolConfig({
-      appName: editForm.value.appName,
-      threadPoolName: editForm.value.threadPoolName,
-      corePoolSize: editForm.value.corePoolSize,
-      maximumPoolSize: editForm.value.maximumPoolSize
-    })
+    if (isVirtualExecutor(editForm.value)) {
+      await updateVirtualLimit(editForm.value.appName, editForm.value.instanceId, editForm.value.executorName, {
+        concurrencyLimit: editForm.value.concurrencyLimit,
+        operator: 'admin'
+      })
+    } else {
+      await resizeExecutor(editForm.value.appName, editForm.value.instanceId, editForm.value.executorName, {
+        corePoolSize: editForm.value.corePoolSize,
+        maximumPoolSize: editForm.value.maximumPoolSize,
+        keepAliveSeconds: editForm.value.keepAliveSeconds,
+        allowCoreThreadTimeOut: editForm.value.allowCoreThreadTimeOut,
+        operator: 'admin'
+      })
+    }
     ElMessage.success('配置更新成功')
     editDialogVisible.value = false
     fetchData()
@@ -331,5 +441,6 @@ onUnmounted(() => {
 .status-info {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
 }
 </style>

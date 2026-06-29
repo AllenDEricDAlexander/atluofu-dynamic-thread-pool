@@ -2,7 +2,7 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
 const request = axios.create({
-  baseURL: '/api/v1/dynamic/thread/pool',
+  baseURL: '/api/v1/dtp',
   timeout: 10000
 })
 
