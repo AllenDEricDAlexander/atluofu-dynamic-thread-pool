@@ -102,7 +102,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>top.atluofu.middleware.dynamic.thread.pool.Application</mainClass>
+                    <mainClass>top.atluofu.middleware.dynamic.thread.pool.AdminApplication</mainClass>
                     <layout>JAR</layout>
                 </configuration>
             </plugin>

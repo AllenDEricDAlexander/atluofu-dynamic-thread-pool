@@ -41,7 +41,7 @@ class ApplicationRedisClientConfigPropertiesTest {
     @Test
     void shouldBindRedisPropertiesFromDynamicThreadPoolPrefix() {
         contextRunner.run(context -> {
-            Application.RedisClientConfigProperties properties = context.getBean(Application.RedisClientConfigProperties.class);
+            AdminApplication.RedisClientConfigProperties properties = context.getBean(AdminApplication.RedisClientConfigProperties.class);
 
             assertThat(properties.getHost()).isEqualTo("127.0.0.1");
             assertThat(properties.getPort()).isEqualTo(6379);
@@ -60,7 +60,7 @@ class ApplicationRedisClientConfigPropertiesTest {
 
     @Test
     void shouldSerializeDtpMessageInstantWithAdminRedisObjectMapper() throws Exception {
-        ObjectMapper objectMapper = Application.RedisClientConfig.createRedisObjectMapper();
+        ObjectMapper objectMapper = AdminApplication.RedisClientConfig.createRedisObjectMapper();
         DtpConfigChangeMessage message = new DtpConfigChangeMessage();
         message.setAppName("order-app");
         message.setTimestamp(Instant.parse("2026-06-30T00:00:00Z"));
@@ -72,12 +72,21 @@ class ApplicationRedisClientConfigPropertiesTest {
 
     @Test
     void shouldExcludeStarterAutoConfigurationFromAdminApplication() {
-        assertThat(Application.class.getAnnotation(org.springframework.boot.autoconfigure.SpringBootApplication.class).exclude())
+        assertThat(AdminApplication.class.getAnnotation(org.springframework.boot.autoconfigure.SpringBootApplication.class).exclude())
                 .contains(DynamicThreadPoolAutoConfig.class);
     }
 
+    @Test
+    void shouldLimitAdminComponentScanToAdminComponents() {
+        assertThat(AdminApplication.class.getAnnotation(org.springframework.boot.autoconfigure.SpringBootApplication.class).scanBasePackages())
+                .containsExactlyInAnyOrder(
+                        "top.atluofu.middleware.dynamic.thread.pool.config",
+                        "top.atluofu.middleware.dynamic.thread.pool.trigger"
+                );
+    }
+
     @Configuration
-    @EnableConfigurationProperties(Application.RedisClientConfigProperties.class)
+    @EnableConfigurationProperties(AdminApplication.RedisClientConfigProperties.class)
     static class PropertiesConfiguration {
     }
 

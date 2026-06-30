@@ -21,12 +21,18 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import top.atluofu.middleware.dynamic.thread.pool.sdk.config.DynamicThreadPoolAutoConfig;
 
-@SpringBootApplication(exclude = DynamicThreadPoolAutoConfig.class)
+@SpringBootApplication(
+        exclude = DynamicThreadPoolAutoConfig.class,
+        scanBasePackages = {
+                "top.atluofu.middleware.dynamic.thread.pool.config",
+                "top.atluofu.middleware.dynamic.thread.pool.trigger"
+        }
+)
 @Configurable
-public class Application {
+public class AdminApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(Application.class);
+        SpringApplication.run(AdminApplication.class);
     }
 
     @Configuration
